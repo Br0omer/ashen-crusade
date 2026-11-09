@@ -1,0 +1,8 @@
+{
+  "version": "1.0.3-arch03",
+  "build": "arch03-20261110",
+  "status": "candidate",
+  "date": "2026-11-10",
+  "notes": "Единая версия, маркировка сборки и контроль загрузки",
+  "testUrl": "/ashen-crusade/arch03/"
+}
