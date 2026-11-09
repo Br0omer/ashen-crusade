@@ -1,0 +1,2 @@
+const GAME_BUILD={"version":"1.0.3-arch03","build":"arch03-20261110","status":"candidate","date":"2026-11-10","notes":"Единая версия, маркировка сборки и контроль загрузки","testUrl":"/ashen-crusade/arch03/"};
+(function(){const el=document.getElementById('build-info');if(el){el.textContent='Сборка '+GAME_BUILD.version+' · '+GAME_BUILD.build;el.style.display='block'}document.title+=' · '+GAME_BUILD.version})();
