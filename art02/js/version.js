@@ -1,0 +1,2 @@
+const GAME_BUILD={"version": "1.1.1-art02a.1", "build": "art02a-20261110-1", "status": "candidate", "date": "2026-11-10", "notes": "ART-02a: cached rig walk animation and recoil; two mirrored views only", "testUrl": "/ashen-crusade/art02/", "baseline": "1.1.0-art01.1"};
+(function(){const el=document.getElementById("build-info");if(el)el.textContent="Сборка "+GAME_BUILD.version;document.title="Пепельный крестовый поход · "+GAME_BUILD.version;})();

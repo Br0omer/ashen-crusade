@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="color-scheme" content="dark">
+<title>Пепельный крестовый поход · ART-02a</title>
+<link rel="stylesheet" href="style.css">
+<style>
+#build-info{position:fixed;top:8px;left:310px;z-index:5;background:#141924eb;color:#ffe0a2;padding:5px 9px;border:1px solid #9b7849;border-radius:5px;font:11px system-ui;pointer-events:none}
+#diagnostics{position:fixed;right:12px;top:55px;z-index:6;white-space:pre-line;background:#080b12ef;color:#e8d6b3;padding:10px;border:1px solid #9b7849;border-radius:7px;font:14px monospace;pointer-events:none}
+#start{z-index:4;overflow:auto;box-sizing:border-box;background:#090b12f5}
+.art-card{display:flex;align-items:center;gap:30px;max-width:780px;text-align:left}
+#hero-preview{width:180px;height:222px;object-fit:contain;flex-shrink:0}
+.art-copy{max-width:510px}h1{font-size:clamp(20px,3vw,30px);margin:0 0 18px}
+.art-copy p{line-height:1.5}.eyebrow{color:#c8aa70;font-size:13px;letter-spacing:2px}
+#asset-status{font-size:12px;color:#bcafa0}button:disabled{opacity:.4}
+#tip{max-width:96%;font-size:11px}
+@media(max-width:700px){.art-card{gap:12px}#hero-preview{width:115px;height:160px}#build-info{top:auto;bottom:70px;left:12px;font-size:10px}.art-copy p{font-size:13px}}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="build-info">ART-02a · загрузка сборки…</div>
+<div id="diagnostics" hidden></div>
+<div id="tip">View — FPS · LS движение · RS прицел · RT огонь · X меч · B рывок · Y импульс · LB лечение · Menu пауза. ПК: WASD, мышь, пробел, E, Q, H, F3.</div>
+<div id="start"><div class="art-card">
+<img id="hero-preview" alt="Утверждённый бронированный герой">
+<div class="art-copy"><p class="eyebrow">ART-02a / ИГРОВОЙ СПРАЙТ</p>
+<h1>ПЕПЕЛЬНЫЙ<br>КРЕСТОВЫЙ ПОХОД</h1>
+<p>Раздельное движение ног, движение ткани и отдача оружия. Утверждённый рисунок сохранён.</p>
+<p>Первый подэтап ART-02: ходьба и стрельба. Пока два зеркальных вида; новые ракурсы вверх и вниз ещё не добавлены.</p>
+<button id="play" disabled>Начать зачистку</button>
+<p id="asset-status" role="status" aria-live="polite">Загружаем изображение героя…</p></div>
+</div></div>
+<script src="js/version.js" defer></script>
+<script src="js/core.js" defer></script>
+<script src="js/input.js" defer></script>
+<script src="js/state.js" defer></script>
+<script src="js/gameplay.js" defer></script>
+<script src="js/render.js" defer></script>
+<script src="js/hero-art.js" defer></script>
+<script src="js/diagnostics.js" defer></script>
+<script src="js/boot.js" defer></script>
+</body></html>
