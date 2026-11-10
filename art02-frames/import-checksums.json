@@ -1,0 +1,26 @@
+{
+  "archiveSHA256": "f57e3563e2884ae7b43b28956382aceff9f45796b9dbe49358324a0a8a5d742f",
+  "files": {
+    "art02-frames/assets/brute-sprites.svg": "6497cddf2a5acdd2e1a4d9f9072ba3a4ff4b10ea057f03e8f4e79f50315187cd",
+    "art02-frames/assets/cultist-sprites.svg": "bd296bebd4ea9334885ee3162b5cee979e7b3b50768e54010f2baad43241e0db",
+    "art02-frames/assets/hero-idle.webp": "73674519a711d4e1a9ecc79d4b4c48b81cef28d91f48432f3820551d1393b830",
+    "art02-frames/assets/hero-walk-8.json": "0b1dea52d17f2a4a4f8f4a35814dbefaa952a937cb65872d40e5e8e948528cf1",
+    "art02-frames/assets/hero-walk-8.webp": "c3f9d14fe546faae15d1fdf6e261561b00856f2075add9c076667e27772dc294",
+    "art02-frames/build.json": "d1979bca0fec0a88d566be681bde7641e97438cc92602d751d39eacd093f2b71",
+    "art02-frames/index.html": "8936de54f5545f04c39f29334e15faeb93786823d59906f76fef1f0c4c0ba629",
+    "art02-frames/js/boot.js": "62a08800965ce874eb1582d00155eff38fa4b5f36a3b3e0610de590547278c82",
+    "art02-frames/js/core.js": "9c2bd92e9a4b2216bed91f81ee9cc0e09081043a3daa135ae819c3e234e94528",
+    "art02-frames/js/diagnostics.js": "5e478368c20d5f06152afac8e2d2f2535ff09a9540fa70fbcc0a421e35903434",
+    "art02-frames/js/gameplay.js": "e180bf19bb0de3d4ff169ae5c14272c96707502a6ae367ef018d729ab8b191fb",
+    "art02-frames/js/hero-art.js": "af2570ab9238cbb05876e840ccd63ffd416b1daf94e1bca3ad741bd73fa760a9",
+    "art02-frames/js/input.js": "6a44f93670779a8487fa45674984d2d80dce74ed4971b2a34454894258e570f9",
+    "art02-frames/js/render.js": "ba388a074206179a283e2660d39c80ada632c11f64a4ec74bead9b49658e2ddb",
+    "art02-frames/js/state.js": "a1a815917670bac3254ced2115fbff91da04e10b23ab777640f34372730c0ff1",
+    "art02-frames/js/version.js": "e4d731754578ada3291565aa002dd4768c18214eea89f4581be0f83189f999e7",
+    "art02-frames/style.css": "53d1cc6c7cf19eed1036ec18d7b14ccbfec9883f98000ad5e2768252f9fcc61c",
+    "ashen-crusade-art02-walk.html": "6afd08bda10bc38ce28dbfa1c03b3a14bf029e6aaa0b7ad6b4e61a8a21688a52",
+    "docs/art02-frames.md": "f26d464f2dcb9005b5aacc2193611f24f44c69ff22330040442bcbf771e8baa6",
+    "tests/art02-frames-local.json": "ca23cc7466893d678b1d3cb31e97b535d82fff434f2d4f4bb3092bf40a945373"
+  },
+  "status": "imported byte-for-byte; awaiting Pages deployment and tablet acceptance"
+}

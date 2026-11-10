@@ -1,0 +1,59 @@
+{
+  "test_mode": "Chromium set_content, embedded local assets, simulated gamepad (no live HTTP deployment)",
+  "version": "1.1.2-art02a.3",
+  "atlas": {
+    "w": 1216,
+    "h": 768,
+    "frames": 8
+  },
+  "walking_frames": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "movement": {
+    "x": 414.15450000000044,
+    "y": 0
+  },
+  "stop_idle": true,
+  "shots_at_rest": 2,
+  "shooting_while_walking": {
+    "walking": true,
+    "shots": 4
+  },
+  "pause_freezes_pose": true,
+  "view_toggle": true,
+  "dash": true,
+  "mirror_left": -1,
+  "barrel_alignment": {
+    "maxError": 8.101433657963767e-14,
+    "n": 192
+  },
+  "sampling_invariance": [
+    {
+      "fps": 30,
+      "travel": 8.59999999999992,
+      "frame": 0
+    },
+    {
+      "fps": 60,
+      "travel": 8.600000000000147,
+      "frame": 0
+    },
+    {
+      "fps": 120,
+      "travel": 8.59999999999972,
+      "frame": 0
+    }
+  ],
+  "eight_rendered_frames": true,
+  "javascript_errors": [],
+  "http_errors": [],
+  "approved_visible_pixels_preserved": true,
+  "publication": "not published: no GitHub write actions were available in this session"
+}

@@ -1,0 +1,2 @@
+const GAME_BUILD={"version": "1.1.2-art02a.3", "build": "art02-frames-20261111-1", "status": "local-candidate", "date": "2026-11-11", "notes": "Approved eight drawn walk poses; no texture deformation; candidate not published", "baselineCommit": "35a5ed2dd22f7f43e38a27ae67b659edde9dda79", "testPath": "/art02-frames/"};
+(function(){const el=document.getElementById("build-info");if(el)el.textContent="Сборка "+GAME_BUILD.version;document.title="Пепельный крестовый поход · "+GAME_BUILD.version;})();

@@ -1,0 +1,54 @@
+{
+  "image": "hero-walk-8.webp",
+  "columns": 4,
+  "rows": 2,
+  "cellWidth": 304,
+  "cellHeight": 384,
+  "frames": 8,
+  "anchor": {
+    "x": 140,
+    "y": 363
+  },
+  "muzzles": [
+    {
+      "x": 291,
+      "y": 168
+    },
+    {
+      "x": 289,
+      "y": 168
+    },
+    {
+      "x": 291,
+      "y": 167.5
+    },
+    {
+      "x": 290,
+      "y": 168
+    },
+    {
+      "x": 291,
+      "y": 166.5
+    },
+    {
+      "x": 289,
+      "y": 166.5
+    },
+    {
+      "x": 291,
+      "y": 166.5
+    },
+    {
+      "x": 290,
+      "y": 166.5
+    }
+  ],
+  "cropOriginal": [
+    88,
+    32,
+    392,
+    416
+  ],
+  "sourceSHA256": "e13d8525d84623a334ea23c1297a800deaae3f6f37b26301e37798d5eedacc8f",
+  "note": "8 approved drawn poses. Fixed crop/scale. One view plus horizontal reflection. No mesh deformation."
+}
