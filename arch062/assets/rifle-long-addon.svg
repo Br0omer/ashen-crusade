@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="256" viewBox="0 0 240 256">
+<defs><linearGradient id="steel" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#b5c1bf"/><stop offset=".25" stop-color="#525f65"/><stop offset=".6" stop-color="#28343e"/><stop offset="1" stop-color="#111721"/></linearGradient><linearGradient id="coil" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#b5faf1"/><stop offset=".35" stop-color="#4eadae"/><stop offset="1" stop-color="#184d61"/></linearGradient></defs>
+<!-- Temporary alternative front assembly. Rear receiver and both grips are shared. -->
+<path d="M144 76L154 70H193L199 75H208V81L224 82L232 85V94L225 97H211L208 103H174V100H153L144 94Z" fill="#101722" stroke="#080b10" stroke-width="2"/>
+<path d="M149 78L157 73H191L196 77H205V84H224L229 87V92L224 94H205L203 100H175V96H151Z" fill="url(#steel)"/>
+<path d="M158 74H191L194 77H158Z" fill="#b0c8c9"/>
+<rect x="166" y="78" width="34" height="16" rx="3" fill="#101c26"/>
+<path d="M168 80H196V92H168Z" fill="url(#coil)"/>
+<path d="M172 79V94M178 79V94M184 79V94M190 79V94M196 79V94" stroke="#263d46" stroke-width="2"/>
+<path d="M165 95H201V100H175V98H165Z" fill="#19222c"/>
+<path d="M205 84H223L226 86H206Z" fill="#9baaaa"/>
+<path d="M211 86V94M219 86V94" stroke="#1b2430" stroke-width="2"/>
+<path d="M228 85L232 87V92L228 94Z" fill="#101820" stroke="#637d81" stroke-width="1"/>
+<circle cx="231" cy="89.5" r="1.2" fill="#78e5de"/>
+<circle cx="156" cy="88" r="2" fill="#c2b18a"/><path d="M153 87H159" stroke="#655849"/>
+</svg>

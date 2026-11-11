@@ -1,0 +1,15 @@
+{
+  "browser": "144.0.7559.96",
+  "build": "1.1.0-arch062.1",
+  "environment": "Local files with data-URI assets; HTTP navigation blocked by environment; simulated Xbox, not a physical controller",
+  "load": {"status":"ready", "parts":["lower","upper","hands","weapon"], "weapons":["rifle-default","rifle-long"]},
+  "rifle_a_visual_diff": {"max_channel":85,"changed_pixels":4175,"note":"Scaled Canvas reassembly filtering differs from direct Image; no pixel identity claim"},
+  "nativeSourceReassembly": {"alphaMaxError":0,"opaqueRgbMaxError":2,"note":"Premultiplied Canvas read/write rounding"},
+  "sockets": {"angles":512,"maxError":4.973799150320701e-14},
+  "baseline_regression": {"ticks":7200,"snapshots":31,"identicalWithin":1e-8},
+  "switch_and_controls": {"RB":true,"R":true,"holdDebounced":true,"cooldownPreserved":true,"bodyBuffersShared":true,"pause":true,"dash":true,"View":true,"renderPure":true},
+  "fire_from_both_weapons": {"weapons":2,"directionsPerWeapon":4,"originChecksPassed":8},
+  "missing_asset_error_status":true,
+  "page_errors":[],
+  "tabletAcceptance":"pending"
+}
