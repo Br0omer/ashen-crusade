@@ -1,0 +1,29 @@
+{
+  "build": "1.1.0-arch061.1",
+  "browser": "144.0.7559.96",
+  "checks": {
+    "muzzle_parity_34_angles": {"maxWorldCoordinateDelta": 0.0},
+    "flash_projectile_alignment_256_angles": {"maxPixelError": 2.1316282072803006e-14},
+    "hero_pixel_parity_4_poses": "exact: image, reflection, hit flash and muzzle flash",
+    "render_is_read_only": {"unchanged": true, "socketUnchanged": true, "frozen": true},
+    "gameplay_differential": {
+      "simulationTicks": 7200, "snapshotsCompared": 31,
+      "seconds": 119.16666666666119, "includesBoss": true,
+      "baseline": "accepted ART-01",
+      "same": "movement, damage, enemies, attacks, dash, sword, impulse, heal, pause, XP, loot, score, projectiles, particles"
+    },
+    "replaceable_adapter_no_render": {
+      "passed": true,
+      "origin": {"x": 111, "y": 222, "elevationPx": 7, "vx": 780, "vy": 0, "life": 0.8},
+      "posePreparations": 2
+    },
+    "gamepad_controls": {"moved": true, "dash": true, "shot": true, "pausedOK": true, "resumed": true, "show": true, "hidden": true},
+    "death_restart": {"dead": true, "restarted": true, "validPose": true},
+    "asset_failure": "start remains disabled, explicit error message"
+  },
+  "errors": [],
+  "mode": "offline exact scripts with data-URI image loading (browser network blocked)",
+  "physicalXboxTest": false,
+  "tabletAcceptance": "pending",
+  "result": "PASS"
+}
