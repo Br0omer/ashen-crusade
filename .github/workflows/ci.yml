@@ -1,0 +1,28 @@
+name: Contract tests
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract-tests:
+    name: Character visual contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: ARCH-06.1 pose and socket contract
+        run: node tests/arch061-contract.cjs
+      - name: ARCH-06.2 composite character contract
+        run: node tests/arch062-contract.cjs
