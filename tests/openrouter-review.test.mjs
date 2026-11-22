@@ -44,6 +44,15 @@ test('parses fenced JSON and changes PASS with actionable findings to CHANGES_RE
   assert.deepEqual(answer.manualChecks, ['Проверить геймпад']);
 });
 
+test('a high finding beyond the 15 published ones still changes PASS to CHANGES_REQUESTED', () => {
+  const low = (n) => ({ severity: 'low', file: `src/f${n}.js`, problem: 'Мелочь.', fix: 'Поправить.' });
+  const findings = Array.from({ length: 15 }, (_, i) => low(i));
+  findings.push({ severity: 'high', file: 'src/critical.js', problem: 'Серьёзная ошибка.', fix: 'Исправить.' });
+  const answer = parseReview(JSON.stringify({ verdict: 'PASS', summary: 'Всё хорошо.', findings, manual_checks: [] }));
+  assert.equal(answer.verdict, 'CHANGES_REQUESTED');
+  assert.equal(answer.findings.length, 15);
+});
+
 test('malformed answers fail closed', () => {
   assert.throws(() => parseReview('looks good'), ReviewBlocked);
   assert.throws(() => parseReview('{"verdict":"PASS"}'), ReviewBlocked);
