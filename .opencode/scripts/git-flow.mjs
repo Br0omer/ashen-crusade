@@ -40,6 +40,10 @@ export function commitDetails(message) {
   return { title, body };
 }
 
+export function isOpenPullRequest(pr) {
+  return !!pr && pr.state === 'OPEN' && Number.isInteger(pr.number) && typeof pr.url === 'string';
+}
+
 function run(program, args, { timeout = 120000, quiet = false, allowFailure = false } = {}) {
   const out = spawnSync(program, args, { encoding: 'utf8', timeout, shell: false, maxBuffer: 2 * 1024 * 1024 });
   if (out.error || (out.status !== 0 && !allowFailure)) {
@@ -106,10 +110,11 @@ function publish() {
   requireGithubCLI();
   runContracts();
   git(['push', '--set-upstream', 'origin', `HEAD:refs/heads/${name}`]);
-  const existing = run('gh', ['pr', 'view', name, '--repo', REPO, '--json', 'number,url'], { allowFailure: true });
+  const existing = run('gh', ['pr', 'view', name, '--repo', REPO, '--json', 'number,url,state'], { allowFailure: true });
   let result;
-  if (existing.status === 0) {
-    result = JSON.parse(existing.stdout);
+  const previous = existing.status === 0 ? JSON.parse(existing.stdout) : null;
+  if (isOpenPullRequest(previous)) {
+    result = previous;
   } else {
     const url = run('gh', ['pr', 'create', '--repo', REPO, '--base', 'main', '--head', name,
       '--title', title, '--body', `${body}\n\n---\nАвтоматически создано Git Operator. CI и независимое ревью обязательны. Merge — только по решению владельца.`]).stdout.trim();
