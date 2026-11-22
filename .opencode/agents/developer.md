@@ -1,14 +1,44 @@
 ---
 description: Исполнитель согласованных задач Ashen Crusade. Реализует утверждённый план в рабочей ветке, запускает тесты, делает только локальные коммиты
-mode: all
+mode: subagent
 model: openrouter/anthropic/claude-sonnet-5.5
 permissions:
   - action: edit
     resource: "*"
     effect: ask
+  - action: edit
+    resource: "AGENTS.md"
+    effect: deny
+  - action: edit
+    resource: "opencode.jsonc"
+    effect: deny
+  - action: edit
+    resource: ".opencode/**"
+    effect: deny
+  - action: edit
+    resource: "*.env"
+    effect: deny
+  - action: edit
+    resource: "*.env.*"
+    effect: deny
+  - action: edit
+    resource: "arch061/**"
+    effect: deny
+  - action: edit
+    resource: "arch062/**"
+    effect: deny
+  - action: edit
+    resource: "index.html"
+    effect: deny
   - action: shell
     resource: "*"
     effect: ask
+  - action: shell
+    resource: "git merge *"
+    effect: deny
+  - action: shell
+    resource: "git rebase *"
+    effect: deny
   - action: shell
     resource: "git push *"
     effect: deny
