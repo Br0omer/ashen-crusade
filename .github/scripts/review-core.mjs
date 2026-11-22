@@ -1,6 +1,13 @@
 // Pure functions used by the cloud reviewer and its offline tests.
 export class ReviewBlocked extends Error {}
 
+// Enough room for both reasoning tokens and the final JSON response.
+export const MODEL_GENERATION_SETTINGS = Object.freeze({
+  max_tokens: 6500,
+  reasoning: Object.freeze({ effort: 'low' }),
+  temperature: 0,
+});
+
 export function ciCommitMatchesHead(runSha, headSha, parents = []) {
   return runSha === headSha || parents.some((parent) => parent.sha === headSha);
 }

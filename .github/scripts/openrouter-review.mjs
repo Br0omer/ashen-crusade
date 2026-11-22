@@ -1,4 +1,4 @@
-import { blockedReview, ciCommitMatchesHead, parseReview, prepareChanges, renderComment, ReviewBlocked } from './review-core.mjs';
+import { blockedReview, ciCommitMatchesHead, MODEL_GENERATION_SETTINGS, parseReview, prepareChanges, renderComment, ReviewBlocked } from './review-core.mjs';
 
 const repo = process.env.GITHUB_REPOSITORY;
 const token = process.env.GITHUB_TOKEN;
@@ -156,7 +156,13 @@ async function requestReview(pr, diff, context) {
       'HTTP-Referer': 'https://github.com/Br0omer/ashen-crusade',
       'X-Title': 'Ashen Crusade PR reviewer',
     },
-    body: JSON.stringify({ model, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], max_tokens: 1600, temperature: 0 }),
+    // Reasoning tokens share max_tokens with visible output on many models.
+    // A small budget can yield finish_reason=length and completely empty content.
+    body: JSON.stringify({
+      model,
+      messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
+      ...MODEL_GENERATION_SETTINGS,
+    }),
     signal: AbortSignal.timeout(90000),
   });
   if (!response.ok) throw new ReviewBlocked(`OpenRouter вернул HTTP ${response.status}. Проверьте модель, ключ и баланс.`);
@@ -165,6 +171,16 @@ async function requestReview(pr, diff, context) {
   const text = typeof content === 'string' ? content : Array.isArray(content)
     ? content.filter((part) => typeof part.text === 'string').map((part) => part.text).join('')
     : '';
+  if (!text.trim()) {
+    const finish = String(data.choices?.[0]?.finish_reason || 'unknown');
+    const used = data.usage?.completion_tokens;
+    const reasoningUsed = data.usage?.completion_tokens_details?.reasoning_tokens;
+    throw new ReviewBlocked(
+      `OpenRouter вернул пустой текст (finish_reason=${finish}, output_tokens=${used ?? 'unknown'}, ` +
+      `reasoning_tokens=${reasoningUsed ?? 'unknown'}). Возможно, токены потрачены на рассуждение; ` +
+      'проверьте ограничения модели или выберите другую модель ревьюера.',
+    );
+  }
   return parseReview(text);
 }
 
