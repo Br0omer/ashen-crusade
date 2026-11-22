@@ -26,3 +26,5 @@ jobs:
         run: node tests/arch061-contract.cjs
       - name: ARCH-06.2 composite character contract
         run: node tests/arch062-contract.cjs
+      - name: Cloud reviewer offline tests
+        run: node --test tests/openrouter-review.test.mjs

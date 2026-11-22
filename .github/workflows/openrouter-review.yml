@@ -1,0 +1,52 @@
+name: OpenRouter AI review
+
+on:
+  # Wait for the unprivileged PR CI to finish before spending API tokens.
+  workflow_run:
+    workflows:
+      - Contract tests
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      pull_request_number:
+        description: 'Номер открытого PR для повторной проверки'
+        required: true
+        type: number
+
+# Never give the reviewer access to PR-head code as executable code.
+permissions:
+  actions: read
+  checks: write
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: openrouter-review-${{ github.event.workflow_run.head_branch || github.event.inputs.pull_request_number || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  review:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.event == 'pull_request' &&
+       github.event.workflow_run.name == 'Contract tests')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout trusted default branch only
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Review diff with OpenRouter and publish check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_REVIEW_MODEL: ${{ vars.OPENROUTER_REVIEW_MODEL }}
+          REVIEW_PR_NUMBER: ${{ github.event.inputs.pull_request_number || '' }}
+        run: node .github/scripts/openrouter-review.mjs
