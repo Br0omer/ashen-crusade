@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateBranch, checkChangedFiles, checkWorkingTree, commitDetails } from '../.opencode/scripts/git-flow.mjs';
+import { validateBranch, checkChangedFiles, checkWorkingTree, commitDetails, isOpenPullRequest } from '../.opencode/scripts/git-flow.mjs';
 
 test('branch names are restricted to known feature namespaces', () => {
   for (const name of ['test/arch062-swap-fire', 'fix/gameplay-timing', 'feature/loot-v2', 'chore/ui-tests'])
@@ -33,4 +33,11 @@ test('a detailed commit message supplies the PR title and criteria', () => {
   assert.equal(item.title, 'test: verify weapon switch');
   assert.match(item.body, /Критерии/);
   assert.throws(() => commitDetails('fix: short'), /содержательное тело/);
+});
+
+test('publication never mistakes a closed or merged PR for an open one', () => {
+  assert.equal(isOpenPullRequest({ number: 12, url: 'https://github.com/a/b/pull/12', state: 'OPEN' }), true);
+  assert.equal(isOpenPullRequest({ number: 12, url: 'https://github.com/a/b/pull/12', state: 'CLOSED' }), false);
+  assert.equal(isOpenPullRequest({ number: 12, url: 'https://github.com/a/b/pull/12', state: 'MERGED' }), false);
+  assert.equal(isOpenPullRequest(null), false);
 });
