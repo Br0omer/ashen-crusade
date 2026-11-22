@@ -53,16 +53,22 @@ export function parseReview(raw) {
   if (typeof result.summary !== 'string' || !result.summary.trim() || !Array.isArray(result.findings)) {
     throw new ReviewBlocked('Ответ модели неполон: нужны summary и findings[].');
   }
-  const findings = result.findings.slice(0, 15).map((finding) => ({
+  const allFindings = result.findings.map((finding) => ({
     severity: ['high', 'medium', 'low'].includes(finding?.severity) ? finding.severity : 'medium',
     file: String(finding?.file ?? '').slice(0, 180),
     problem: String(finding?.problem ?? '').slice(0, 900),
     fix: String(finding?.fix ?? '').slice(0, 900),
   }));
+  const severityRank = { high: 0, medium: 1, low: 2 };
+  const findings = allFindings
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) => severityRank[a.item.severity] - severityRank[b.item.severity] || a.index - b.index)
+    .slice(0, 15)
+    .map(({ item }) => item);
   const manualChecks = Array.isArray(result.manual_checks)
     ? result.manual_checks.slice(0, 8).map((item) => String(item).slice(0, 350))
     : [];
-  const hasMaterialFinding = findings.some((item) => ['high', 'medium'].includes(item.severity));
+  const hasMaterialFinding = allFindings.some((item) => ['high', 'medium'].includes(item.severity));
   return {
     verdict: result.verdict === 'PASS' && hasMaterialFinding ? 'CHANGES_REQUESTED' : result.verdict,
     summary: result.summary.trim().slice(0, 1900),
