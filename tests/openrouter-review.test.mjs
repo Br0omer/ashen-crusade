@@ -1,8 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { blockedReview, ciCommitMatchesHead, parseReview, prepareChanges, renderComment, ReviewBlocked } from '../.github/scripts/review-core.mjs';
+import { blockedReview, ciCommitMatchesHead, MODEL_GENERATION_SETTINGS, parseReview, prepareChanges, renderComment, ReviewBlocked } from '../.github/scripts/review-core.mjs';
 
 const patch = { filename: 'src/player.js', status: 'modified', additions: 2, deletions: 1, patch: '@@ -1 +1 @@\n-old\n+new' };
+
+test('model generation budget leaves room for reasoning and a visible JSON answer', () => {
+  assert.ok(MODEL_GENERATION_SETTINGS.max_tokens >= 4000);
+  assert.equal(MODEL_GENERATION_SETTINGS.reasoning.effort, 'low');
+});
 
 test('review uses the actual diff', () => {
   const text = prepareChanges([patch]);
