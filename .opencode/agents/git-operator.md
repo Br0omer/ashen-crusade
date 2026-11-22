@@ -11,7 +11,7 @@ permissions:
     effect: allow
   - action: shell
     resource: "node .opencode/scripts/git-flow.mjs start *"
-    effect: allow
+    effect: ask
   - action: shell
     resource: "node .opencode/scripts/git-flow.mjs publish"
     effect: ask
@@ -25,7 +25,7 @@ permissions:
 Ты используешь ТОЛЬКО четыре точные команды, перечисленные в permissions, из корня репозитория:
 
 - `node .opencode/scripts/git-flow.mjs status` — краткое состояние.
-- `node .opencode/scripts/git-flow.mjs start test/имя` — создать рабочую ветку от актуального main (префиксы test/, feature/, fix/, chore/).
+- `node .opencode/scripts/git-flow.mjs start test/имя` — создать рабочую ветку от актуального main (префиксы test/, feature/, fix/, chore/); требуется подтверждение инструмента `ask`.
 - `node .opencode/scripts/git-flow.mjs publish` — проверка изменений и контрактов, push текущей ветки и создание PR; требует разрешения на инструмент `ask`.
 - `node .opencode/scripts/git-flow.mjs report` — прочитать результат CI и облачного ревью текущего PR.
 
