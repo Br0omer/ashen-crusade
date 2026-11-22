@@ -51,6 +51,25 @@ test('a high finding beyond the 15 published ones still changes PASS to CHANGES_
   const answer = parseReview(JSON.stringify({ verdict: 'PASS', summary: 'Всё хорошо.', findings, manual_checks: [] }));
   assert.equal(answer.verdict, 'CHANGES_REQUESTED');
   assert.equal(answer.findings.length, 15);
+  assert.ok(answer.findings.some((item) => item.file === 'src/critical.js' && item.severity === 'high'));
+  assert.equal(answer.findings[0].file, 'src/critical.js');
+});
+
+test('16 low findings keep PASS and only 15 are published', () => {
+  const findings = Array.from({ length: 16 }, (_, i) => ({ severity: 'low', file: `src/f${i}.js`, problem: 'Мелочь.', fix: 'Поправить.' }));
+  const answer = parseReview(JSON.stringify({ verdict: 'PASS', summary: 'Всё хорошо.', findings, manual_checks: [] }));
+  assert.equal(answer.verdict, 'PASS');
+  assert.equal(answer.findings.length, 15);
+  assert.deepEqual(answer.findings.map((item) => item.file), findings.slice(0, 15).map((item) => item.file));
+});
+
+test('published findings are ordered high, medium, low and keep original order within a level', () => {
+  const make = (severity, n) => ({ severity, file: `src/${severity}${n}.js`, problem: 'Проблема.', fix: 'Исправить.' });
+  const findings = [make('low', 1), make('medium', 1), make('high', 1), make('low', 2), make('high', 2), make('medium', 2)];
+  const answer = parseReview(JSON.stringify({ verdict: 'PASS', summary: 'Итог.', findings, manual_checks: [] }));
+  assert.deepEqual(answer.findings.map((item) => item.file), [
+    'src/high1.js', 'src/high2.js', 'src/medium1.js', 'src/medium2.js', 'src/low1.js', 'src/low2.js',
+  ]);
 });
 
 test('malformed answers fail closed', () => {
