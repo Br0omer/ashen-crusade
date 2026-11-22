@@ -28,6 +28,18 @@ permissions:
     resource: "arch062/**"
     effect: deny
   - action: edit
+    resource: "v103/**"
+    effect: deny
+  - action: edit
+    resource: "arch03/**"
+    effect: deny
+  - action: edit
+    resource: "art01/**"
+    effect: deny
+  - action: edit
+    resource: "releases/**"
+    effect: deny
+  - action: edit
     resource: "index.html"
     effect: deny
   - action: shell
