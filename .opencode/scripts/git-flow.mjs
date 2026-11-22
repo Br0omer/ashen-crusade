@@ -10,7 +10,9 @@ import { fileURLToPath } from 'node:url';
 const REPO = 'Br0omer/ashen-crusade';
 const BRANCH_RE = /^(?:test|fix|feature|chore)\/[a-z0-9][a-z0-9._-]{1,63}$/;
 const RESERVED_FILES = new Set(['AGENTS.md', 'opencode.jsonc', 'index.html', 'docs/releases.md']);
-const RESERVED_DIRS = ['.github/', '.opencode/', 'arch061/', 'arch062/', 'v103/', 'arch03/', 'art01/', 'releases/'];
+const RESERVED_DIRS = ['.github/', '.opencode/', 'arch061/', 'arch062/', 'v103/', 'arch03/', 'art01/',
+  'arch01/', 'arch02/', 'arch05/', 'v101/', 'v102/', 'releases/', 'js/', 'assets/'];
+const ROOT_ASSET = /^[^/]+\.(?:html?|[cm]?js|css|svg|png|jpe?g|webp|json)$/i;
 
 export function validateBranch(name) {
   if (typeof name !== 'string' || !BRANCH_RE.test(name) || name.includes('..') || name.endsWith('.lock'))
@@ -20,7 +22,7 @@ export function validateBranch(name) {
 
 export function checkChangedFiles(files) {
   if (!Array.isArray(files) || !files.length) throw new Error('Нет изменений относительно origin/main.');
-  const blocked = files.filter(p => RESERVED_FILES.has(p) || RESERVED_DIRS.some(d => p.startsWith(d)) ||
+  const blocked = files.filter(p => RESERVED_FILES.has(p) || RESERVED_DIRS.some(d => p.startsWith(d)) || ROOT_ASSET.test(p) ||
     /(?:^|\/)\.env(?:\.|$)/i.test(p) || p.split('/').includes('..') || /[\x00-\x1f]/.test(p));
   if (blocked.length) throw new Error('Изменены защищённые пути: ' + blocked.join(', ') + '. Нужен отдельный согласованный процесс.');
   return files;
@@ -28,7 +30,7 @@ export function checkChangedFiles(files) {
 
 export function checkWorkingTree(porcelain) {
   const lines = String(porcelain).split(/\r?\n/).filter(Boolean);
-  const unexpected = lines.filter(line => line !== '?? .DS_Store');
+  const unexpected = lines.filter(line => !/^\?\? (?:[^/]+\/)*\.DS_Store$/.test(line));
   if (unexpected.length) throw new Error('Рабочее дерево не чистое: ' + unexpected.join(' | ').slice(0, 700));
 }
 
@@ -42,6 +44,28 @@ export function commitDetails(message) {
 
 export function isOpenPullRequest(pr) {
   return !!pr && pr.state === 'OPEN' && Number.isInteger(pr.number) && typeof pr.url === 'string';
+}
+
+export function summarizeReview(pr) {
+  const checks = (pr.statusCheckRollup || []).map(x => ({ name: x.name || x.context,
+    state: x.status || x.state, conclusion: x.conclusion || null }));
+  const checksPending = checks.length === 0 || checks.some(x => {
+    if (x.state === 'COMPLETED') return false;
+    return !['SUCCESS', 'FAILURE', 'ERROR', 'CANCELLED', 'SKIPPED', 'TIMED_OUT'].includes(x.state);
+  });
+  const checksFailed = checks.some(x => ['FAILURE', 'ERROR', 'CANCELLED', 'TIMED_OUT', 'ACTION_REQUIRED'].includes(x.conclusion) ||
+    ['FAILURE', 'ERROR', 'CANCELLED', 'TIMED_OUT'].includes(x.state));
+  const reviews = (pr.comments || []).filter(x => x.body?.includes('<!-- ashen-cloud-review-bot -->'));
+  const comment = reviews.at(-1)?.body || null;
+  const head = String(pr.headRefOid || '');
+  const reviewedSha = comment?.match(/- Коммит:\s*`([0-9a-f]{7,40})`/i)?.[1] || null;
+  const currentReview = !!reviewedSha && head.startsWith(reviewedSha);
+  const reviewVerdict = checksPending || !currentReview
+    ? 'PENDING'
+    : (comment?.match(/Облачное ревью PR\s*[—-]\s*(PASS|CHANGES_REQUESTED|BLOCKED)/)?.[1] || 'PENDING');
+  const verdict = checksFailed && reviewVerdict === 'PASS' ? 'BLOCKED' : reviewVerdict;
+  return { checks, checksFailed, verdict, reviewStale: !!comment && !currentReview,
+    reviewerComment: currentReview ? comment?.slice(0, 12000) : null };
 }
 
 function run(program, args, { timeout = 120000, quiet = false, allowFailure = false } = {}) {
@@ -128,13 +152,9 @@ function report() {
   requireGithubCLI();
   const raw = run('gh', ['pr', 'view', name, '--repo', REPO, '--json', 'number,url,state,headRefOid,statusCheckRollup,comments']).stdout;
   const pr = JSON.parse(raw);
-  const reviews = (pr.comments || []).filter(x => x.body?.includes('<!-- ashen-cloud-review-bot -->'));
-  const comment = reviews.at(-1)?.body || null;
-  const verdict = comment?.match(/Облачное ревью PR\s*[—-]\s*(PASS|CHANGES_REQUESTED|BLOCKED)/)?.[1] || 'PENDING';
-  const checks = (pr.statusCheckRollup || []).map(x => ({ name: x.name || x.context,
-    state: x.status || x.state, conclusion: x.conclusion || null }));
+  const { checks, checksFailed, verdict, reviewStale, reviewerComment } = summarizeReview(pr);
   console.log(JSON.stringify({ operation: 'report', branch: name, pr: pr.number, url: pr.url,
-    head: pr.headRefOid, state: pr.state, checks, verdict, reviewerComment: comment?.slice(0, 12000) || null }));
+    head: pr.headRefOid, state: pr.state, checks, checksFailed, verdict, reviewStale, reviewerComment }));
 }
 
 function main() {
