@@ -16,7 +16,9 @@ test('protected game builds, infrastructure, and environment paths block publica
     'arch062/js/gameplay.js', 'art01/index.html', 'arch03/index.html', 'v103/index.html',
     'releases/1.0.3-arch03/index.html', 'docs/releases.md', '.env', 'sub/.env.local',
     'game.js', 'style.css', 'play-v051.html', 'ashen-crusade-art02-walk.html', 'build.json',
-    'js/gameplay.js', 'assets/hero-approved.webp', 'arch01/index.html', 'v101/index.html'];
+    'js/gameplay.js', 'assets/hero-approved.webp', 'arch01/index.html', 'v101/index.html',
+    'art02/index.html', 'art02-fix1/index.html', 'art02-frames/index.html',
+    'art02-gait-study/gait.js', 'art02-armor-study/index.html'];
   for (const path of protectedPaths) assert.throws(() => checkChangedFiles(['tests/new.cjs', path]), /защищённые пути/, path);
   assert.throws(() => checkChangedFiles(['tests/\nstrange.cjs']), /защищённые пути/);
   assert.deepEqual(checkChangedFiles(['tests/arch062-swap-fire.cjs', 'tests/arch062-contract.cjs']),
