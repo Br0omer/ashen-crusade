@@ -4,7 +4,13 @@ export function describeOpenRouterFailure(status, body) {
   let payload;
   try { payload = typeof body === 'string' && body.length <= 16384 ? JSON.parse(body) : null; } catch { payload = null; }
   const error = payload?.error ?? {};
-  const message = [error.message, error.type, error.code].filter(x => typeof x === 'string').join(' ');
+  // Provider wrappers sometimes put their explanation in metadata.raw. Inspect it
+  // only for classification: never include it in the returned/public message.
+  const raw = error.metadata?.raw;
+  const wrapped = typeof raw === 'string' ? raw.slice(0, 4000)
+    : raw && typeof raw === 'object' ? JSON.stringify(raw).slice(0, 4000) : '';
+  const message = [error.message, error.type, error.code, wrapped]
+    .filter(x => typeof x === 'string' || typeof x === 'number').map(String).join(' ');
   let reason = 'UNKNOWN';
   if (/\b(?:author|provider)\b.{0,60}\bbann?ed\b/i.test(message)) reason = 'PROVIDER_RESTRICTED';
   else if (/\b(?:country|region|territory|geograph\w*|location)\b/i.test(message)) reason = 'REGION_RESTRICTED';
