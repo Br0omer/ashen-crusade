@@ -21,3 +21,4 @@ assert.throws(()=>vm.runInContext("view.getSocket('missing')",context),/Unknown 
 assert.throws(()=>vm.runInContext("view.preparePose({root:{x:0,y:0},velocity:{x:0,y:0},aimAngle:0,time:0,weaponId:'missing'})",context),/Unsupported weapon/);
 assert.throws(()=>vm.runInContext("view.preparePose({root:{x:NaN,y:0},velocity:{x:0,y:0},aimAngle:0,time:0,weaponId:'rifle-default'})",context),/finite/);
 console.log('PASS: 512 socket directions, immutable pose, unknown weapon/socket guards.');
+require('./arch062-swap-fire.cjs').run().catch(error=>{console.error(error);process.exitCode=1;});
