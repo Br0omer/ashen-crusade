@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { validateBranch, checkChangedFiles, checkWorkingTree, commitDetails, isOpenPullRequest, summarizeReview } from '../.opencode/scripts/git-flow.mjs';
 
 test('branch names are restricted to known feature namespaces', () => {
@@ -72,4 +73,38 @@ test('a failed CI check cannot be presented as final PASS', () => {
   const answer = summarizeReview(sample);
   assert.equal(answer.checksFailed, true);
   assert.equal(answer.verdict, 'BLOCKED');
+});
+
+test('Git approval rules are narrow and ask only in primary Architect', () => {
+  const rules = (agent) => {
+    const raw = readFileSync(new URL(`../.opencode/agents/${agent}.md`, import.meta.url), 'utf8');
+    const frontmatter = raw.match(/^---\\n([\\s\\S]*?)\\n---/);
+    assert.ok(frontmatter, `missing frontmatter: ${agent}`);
+    return [...frontmatter[1].matchAll(/  - action: ([^\\n]+)\\n    resource: ([^\\n]+)\\n    effect: ([^\\n]+)/g)]
+      .map(([, action, resource, effect]) => ({
+        action: action.replaceAll('"', ''), resource: resource.replaceAll('"', ''), effect,
+      }));
+  };
+  const architect = rules('architect');
+  const primaryShell = architect.filter((x) => x.action === 'shell');
+  assert.deepEqual(primaryShell, [
+    { action: 'shell', resource: '*', effect: 'deny' },
+    { action: 'shell', resource: 'node .opencode/scripts/git-flow.mjs status', effect: 'ask' },
+    { action: 'shell', resource: 'node .opencode/scripts/git-flow.mjs start *', effect: 'ask' },
+    { action: 'shell', resource: 'node .opencode/scripts/git-flow.mjs publish', effect: 'ask' },
+  ]);
+  assert.ok(architect.some((x) => x.action === 'edit' && x.resource === '*' && x.effect === 'deny'));
+  assert.ok(architect.some((x) => x.action === 'subagent' && x.resource === '*' && x.effect === 'deny'));
+
+  const child = rules('git-operator');
+  assert.deepEqual(child, [
+    { action: '*', resource: '*', effect: 'deny' },
+    { action: 'shell', resource: 'node .opencode/scripts/git-flow.mjs status', effect: 'allow' },
+    { action: 'shell', resource: 'node .opencode/scripts/git-flow.mjs report', effect: 'allow' },
+  ]);
+  for (const agent of ['architect', 'git-operator']) {
+    const config = readFileSync(new URL(`../.opencode/agents/${agent}.md`, import.meta.url), 'utf8');
+    assert.match(config, /start/);
+    assert.match(config, /publish/);
+  }
 });
