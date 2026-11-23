@@ -213,7 +213,7 @@ test('wrapped provider error is classified but metadata.raw never leaves the fun
 
 test('large PR is reviewed in lossless bounded windows without omitting files', () => {
   const files = [
-    { ...patch, filename: 'prototypes/rifles-b1/js/gameplay.js', patch: '@@ -1 +1 @@\n' + Array.from({ length: 120 }, (_, i) => '+const step' + i + ' = ' + i + ';\n').join('') },
+    { ...patch, filename: 'prototypes/rifles-b1/js/gameplay.js', patch: '@@ -1 +1 @@\n\n' + Array.from({ length: 120 }, (_, i) => '+const step' + i + ' = ' + i + ';\n').join('') },
     { ...patch, filename: 'tests/rifles-b1-contract.cjs', patch: '@@ -1 +1 @@\n' + Array.from({ length: 110 }, (_, i) => '+test(' + i + ');\n').join('') },
   ];
   const windows = prepareReviewChunks(files, { maxPatchChars: 950, maxChunks: 20 });
@@ -224,7 +224,7 @@ test('large PR is reviewed in lossless bounded windows without omitting files', 
       new RegExp('FILE: ' + file.filename.replace(/[.*+?^$`{}()|[\]\\]/g, '\\$&') +
         '[^]*?PART: [0-9]+/[0-9]+\\n([^]*?)(?=\\n\\nFILE: |$)', 'g'))].map(m => m[1]));
     assert.ok(parts.length, 'missing file ' + file.filename);
-    assert.equal(parts.join('').replaceAll('\n\n', ''), file.patch);
+    assert.equal(parts.join(''), file.patch);
   }
 });
 
