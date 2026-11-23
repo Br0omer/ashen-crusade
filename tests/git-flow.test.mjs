@@ -80,10 +80,13 @@ test('Git approval rules are narrow and ask only in primary Architect', () => {
     const raw = readFileSync(new URL(`../.opencode/agents/${agent}.md`, import.meta.url), 'utf8');
     const frontmatter = raw.match(/^---\n([\s\S]*?)\n---/);
     assert.ok(frontmatter, `missing frontmatter: ${agent}`);
-    return [...frontmatter[1].matchAll(/  - action: ([^\n]+)\n    resource: ([^\n]+)\n    effect: ([^\n]+)/g)]
+    const parsed = [...frontmatter[1].matchAll(/  - action: ([^\n]+)\n    resource: ([^\n]+)\n    effect: ([^\n]+)/g)]
       .map(([, action, resource, effect]) => ({
         action: action.replaceAll('"', ''), resource: resource.replaceAll('"', ''), effect,
       }));
+    const itemCount = frontmatter[1].split('\n').filter((line) => /^  - /.test(line)).length;
+    assert.equal(parsed.length, itemCount, `unrecognised permission syntax in ${agent}`);
+    return parsed;
   };
   const architect = rules('architect');
   // Assert the entire ordered permission list. Later rules can override denies.
