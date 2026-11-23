@@ -78,9 +78,9 @@ test('a failed CI check cannot be presented as final PASS', () => {
 test('Git approval rules are narrow and ask only in primary Architect', () => {
   const rules = (agent) => {
     const raw = readFileSync(new URL(`../.opencode/agents/${agent}.md`, import.meta.url), 'utf8');
-    const frontmatter = raw.match(/^---\\n([\\s\\S]*?)\\n---/);
+    const frontmatter = raw.match(/^---\n([\s\S]*?)\n---/);
     assert.ok(frontmatter, `missing frontmatter: ${agent}`);
-    return [...frontmatter[1].matchAll(/  - action: ([^\\n]+)\\n    resource: ([^\\n]+)\\n    effect: ([^\\n]+)/g)]
+    return [...frontmatter[1].matchAll(/  - action: ([^\n]+)\n    resource: ([^\n]+)\n    effect: ([^\n]+)/g)]
       .map(([, action, resource, effect]) => ({
         action: action.replaceAll('"', ''), resource: resource.replaceAll('"', ''), effect,
       }));
