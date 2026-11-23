@@ -16,8 +16,9 @@ export function describeOpenRouterFailure(status, body) {
   else if (/\b(?:unauthorized|authentication|invalid.key|permission.denied)\b/i.test(message))
     reason = 'AUTHORIZATION';
   const safeCode = (value) => {
-    const code = String(value ?? '');
-    return /^[a-z0-9_.-]{1,48}$/i.test(code) ? code : null;
+    const code = String(value ?? '').toLowerCase();
+    return new Set(['403', 'forbidden', 'content_policy_violation', 'policy_violation',
+      'permission_denied', 'access_denied', 'guardrail_block', 'moderation']).has(code) ? code : null;
   };
   const code = safeCode(error.code);
   const providerCode = safeCode(error.metadata?.provider_code);
