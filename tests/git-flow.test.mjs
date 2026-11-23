@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { validateBranch, checkChangedFiles, checkWorkingTree, commitDetails, isOpenPullRequest, summarizeReview } from '../.opencode/scripts/git-flow.mjs';
+import { validateBranch, checkChangedFiles, checkWorkingTree, commitDetails, isOpenPullRequest, summarizeReview, tabletPreviewSection, replaceTabletPreview } from '../.opencode/scripts/git-flow.mjs';
 
 test('branch names are restricted to known feature namespaces', () => {
   for (const name of ['test/arch062-swap-fire', 'fix/gameplay-timing', 'feature/loot-v2', 'chore/ui-tests'])
@@ -120,4 +120,21 @@ test('Pipeline V2 allows only exact Git commands from Architect', () => {
     assert.match(config, /start/);
     assert.match(config, /publish/);
   }
+});
+
+test('game PR body gets SHA-pinned preview, stale links are replaced, and other PRs stay clean', () => {
+  const sha = 'b'.repeat(40), next = 'c'.repeat(40);
+  const paths = ['prototypes/rifles-b1/js/gameplay.js', 'tests/arch062-contract.cjs'];
+  const hasIndex = (p) => p === 'prototypes/rifles-b1/index.html';
+  const one = tabletPreviewSection(paths, sha, hasIndex);
+  assert.match(one, /raw\.githack\.com/);
+  assert.match(one, new RegExp(sha));
+  assert.match(one, /UNVERIFIED/);
+  assert.match(one, /PENDING/);
+  assert.equal(tabletPreviewSection(['docs/increments/a.md'], sha, hasIndex), '');
+  assert.throws(() => tabletPreviewSection(paths, 'main', hasIndex));
+  const body = replaceTabletPreview('Existing PR details', one);
+  assert.equal(replaceTabletPreview(body, tabletPreviewSection(paths, next, hasIndex)).includes(sha), false);
+  assert.equal(replaceTabletPreview(body, one), body);
+  assert.throws(() => replaceTabletPreview('broken <!-- ashen-tablet-preview:start -->', one));
 });
