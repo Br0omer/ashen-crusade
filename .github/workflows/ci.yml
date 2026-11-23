@@ -32,4 +32,44 @@ jobs:
         run: node --test tests/git-flow.test.mjs
       - name: Pipeline V2 role and workflow tests
         run: node --test tests/pipeline-v2.test.mjs
+      - name: Browser preview offline tests
+        run: node --test tests/browser-preview-smoke.test.mjs
 
+
+  browser-preview:
+    name: Browser preview smoke
+    if: github.event_name == 'pull_request'
+    needs: contract-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout PR merge commit (read-only)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Detect changed browser prototypes
+        id: detect
+        run: |
+          if git diff --name-only HEAD^1 HEAD^2 | grep -Eq '^prototypes/[a-z0-9-]+/'; then
+            echo "preview=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "preview=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Set up Node.js
+        if: steps.detect.outputs.preview == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install isolated browser runner (no secrets)
+        if: steps.detect.outputs.preview == 'true'
+        run: |
+          npm install --no-save --no-package-lock playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Verify real browser launch at immutable HTTPS SHA
+        if: steps.detect.outputs.preview == 'true'
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node tests/browser-preview-smoke.mjs
