@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { autoBranchName, incrementSpecPath } from '../.opencode/scripts/git-flow.mjs';
-import { changedStatusPaths, readIncrementSpec } from '../.opencode/scripts/dev-flow.mjs';
+import { changedStatusPaths, readIncrementSpec, incrementTempPath } from '../.opencode/scripts/dev-flow.mjs';
 import { buildReviewMessages } from '../.github/scripts/review-core.mjs';
 
 const agent = (name) => readFileSync(new URL(`../.opencode/agents/${name}.md`, import.meta.url), 'utf8');
@@ -71,6 +71,7 @@ test('Developer uses default-deny edits, a safe directory allowlist and fixed co
     'node .opencode/scripts/dev-flow.mjs status',
     'node .opencode/scripts/dev-flow.mjs check',
     'node .opencode/scripts/dev-flow.mjs commit',
+    'node .opencode/scripts/dev-flow.mjs cleanup',
   ]);
   assert.ok(rule(items, 'subagent', '*', 'deny'));
 });
@@ -93,4 +94,13 @@ test('Gemini has QA and gameplay regression requirements beyond code review', ()
   assert.match(messages[0].content, /геймпад/);
   assert.match(messages[0].content, /одновременн/);
   assert.match(messages[0].content, /manual_checks/);
+});
+
+test('cleanup resolves only current increment sidecar and is not arbitrary rm', () => {
+  assert.equal(incrementTempPath('feature/inc-20261123-6a0e525b'),
+    'docs/increments/feature-inc-20261123-6a0e525b.md.tmp');
+  assert.throws(() => incrementTempPath('../arch062'));
+  const raw = agent('developer');
+  assert.match(raw, /dev-flow\.mjs cleanup/);
+  assert.doesNotMatch(raw, /rm -rf/);
 });
