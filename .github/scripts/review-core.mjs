@@ -1,3 +1,38 @@
+// Map OpenRouter failures to safe, actionable categories. Never expose upstream
+// error.message, metadata, request payloads or credentials in public PR comments.
+export function describeOpenRouterFailure(status, body) {
+  let payload;
+  try { payload = typeof body === 'string' && body.length <= 16384 ? JSON.parse(body) : null; } catch { payload = null; }
+  const error = payload?.error ?? {};
+  // Provider wrappers sometimes put their explanation in metadata.raw. Inspect it
+  // only for classification: never include it in the returned/public message.
+  const raw = error.metadata?.raw;
+  const wrapped = typeof raw === 'string' ? raw.slice(0, 4000)
+    : raw && typeof raw === 'object' ? JSON.stringify(raw).slice(0, 4000) : '';
+  const message = [error.message, error.type, error.code, wrapped]
+    .filter(x => typeof x === 'string' || typeof x === 'number').map(String).join(' ');
+  let reason = 'UNKNOWN';
+  if (/\b(?:author|provider)\b.{0,60}\bbann?ed\b/i.test(message)) reason = 'PROVIDER_RESTRICTED';
+  else if (/\b(?:country|region|territory|geograph\w*|location)\b/i.test(message)) reason = 'REGION_RESTRICTED';
+  else if (/\b(?:moderation|safety|content.policy|flagged|terms.of.service|prohibited|refus\w*)\b/i.test(message))
+    reason = 'CONTENT_POLICY';
+  else if (/\b(?:guardrail|allowlist|denylist|blocked.by.policy|not.allowed)\b/i.test(message))
+    reason = 'ACCESS_POLICY';
+  else if (/\b(?:budget|credits?|spend.limit|insufficient.funds)\b/i.test(message)) reason = 'BUDGET_LIMIT';
+  else if (/\b(?:unauthorized|authentication|invalid.key|permission.denied)\b/i.test(message))
+    reason = 'AUTHORIZATION';
+  const safeCode = (value) => {
+    const code = String(value ?? '').toLowerCase();
+    return new Set(['403', 'forbidden', 'content_policy_violation', 'policy_violation',
+      'permission_denied', 'access_denied', 'guardrail_block', 'moderation']).has(code) ? code : null;
+  };
+  const code = safeCode(error.code);
+  const providerCode = safeCode(error.metadata?.provider_code);
+  const details = [code && `code=${code}`, providerCode && `provider_code=${providerCode}`].filter(Boolean);
+  return `OpenRouter HTTP ${Number(status) || 'unknown'}; reason=${reason}${details.length ? '; ' + details.join('; ') : ''}. ` +
+    'Исходный текст ошибки скрыт для защиты данных. Если reason=UNKNOWN, требуется приватная диагностика OpenRouter.';
+}
+
 // Pure functions used by the cloud reviewer and its offline tests.
 export class ReviewBlocked extends Error {}
 

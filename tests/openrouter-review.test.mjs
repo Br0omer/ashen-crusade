@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { blockedReview, buildReviewMessages, ciCommitMatchesHead, isOpenCodeConfigPath, isReviewableSourcePath, MODEL_GENERATION_SETTINGS, OPENCODE_V2_REFERENCE, parseReview, prepareChanges, renderComment, ReviewBlocked, touchesOpenCodeConfig } from '../.github/scripts/review-core.mjs';
+import { blockedReview, buildReviewMessages, ciCommitMatchesHead, describeOpenRouterFailure, isOpenCodeConfigPath, isReviewableSourcePath, MODEL_GENERATION_SETTINGS, OPENCODE_V2_REFERENCE, parseReview, prepareChanges, renderComment, ReviewBlocked, touchesOpenCodeConfig } from '../.github/scripts/review-core.mjs';
 
 const patch = { filename: 'src/player.js', status: 'modified', additions: 2, deletions: 1, patch: '@@ -1 +1 @@\n-old\n+new' };
 
@@ -175,4 +175,38 @@ test('a real security finding about OpenCode config is still published and block
   }));
   assert.equal(answer.verdict, 'CHANGES_REQUESTED');
   assert.equal(answer.findings[0].file, 'opencode.jsonc');
+});
+
+
+test('OpenRouter 403 is classified without leaking provider messages or credentials', () => {
+  const response = JSON.stringify({ error: { message: 'Author google is banned for test@example.com, token sk-or-v1-secret',
+    code: 'sk-or-v1-secret', metadata: { provider_code: '403', flagged_input: 'secret PR content' } } });
+  const description = describeOpenRouterFailure(403, response);
+  assert.match(description, /OpenRouter HTTP 403/);
+  assert.match(description, /reason=PROVIDER_RESTRICTED/);
+  assert.match(description, /provider_code=403/);
+  assert.doesNotMatch(description, /test@example|sk-or|flagged_input|secret PR content|Author google/);
+});
+
+test('OpenRouter errors distinguish region, moderation, guardrails and unknown bodies', () => {
+  const classify = (message) => describeOpenRouterFailure(403, JSON.stringify({ error: { message } }));
+  assert.match(classify('Country or region not supported'), /reason=REGION_RESTRICTED/);
+  assert.match(classify('Request flagged by safety moderation'), /reason=CONTENT_POLICY/);
+  assert.match(classify('Blocked by guardrail policy'), /reason=ACCESS_POLICY/);
+  assert.match(classify('Credit limit reached'), /reason=BUDGET_LIMIT/);
+  assert.match(describeOpenRouterFailure(403, '<html>internal provider payload</html>'), /reason=UNKNOWN/);
+  assert.doesNotMatch(describeOpenRouterFailure(403, '<html>secret</html>'), /secret/);
+});
+
+
+test('wrapped provider error is classified but metadata.raw never leaves the function', () => {
+  const body = JSON.stringify({ error: { message: 'Provider returned error', code: 403,
+    metadata: { raw: { message: 'Country is not supported', credentials: 'sk-or-v1-private' } } } });
+  const description = describeOpenRouterFailure(403, body);
+  assert.match(description, /reason=REGION_RESTRICTED/);
+  assert.match(description, /code=403/);
+  assert.doesNotMatch(description, /Country is not supported|sk-or-v1-private|credentials/);
+  assert.match(describeOpenRouterFailure(403, JSON.stringify({
+    error: { message: 'Permission denied', code: 403 },
+  })), /reason=AUTHORIZATION/);
 });
