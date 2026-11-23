@@ -1,3 +1,31 @@
+// Map OpenRouter failures to safe, actionable categories. Never expose upstream
+// error.message, metadata, request payloads or credentials in public PR comments.
+export function describeOpenRouterFailure(status, body) {
+  let payload;
+  try { payload = typeof body === 'string' && body.length <= 16384 ? JSON.parse(body) : null; } catch { payload = null; }
+  const error = payload?.error ?? {};
+  const message = [error.message, error.type, error.code].filter(x => typeof x === 'string').join(' ');
+  let reason = 'UNKNOWN';
+  if (/\b(?:author|provider)\b.{0,60}\bbann?ed\b/i.test(message)) reason = 'PROVIDER_RESTRICTED';
+  else if (/\b(?:country|region|territory|geograph\w*|location)\b/i.test(message)) reason = 'REGION_RESTRICTED';
+  else if (/\b(?:moderation|safety|content.policy|flagged|terms.of.service|prohibited|refus\w*)\b/i.test(message))
+    reason = 'CONTENT_POLICY';
+  else if (/\b(?:guardrail|allowlist|denylist|blocked.by.policy|not.allowed)\b/i.test(message))
+    reason = 'ACCESS_POLICY';
+  else if (/\b(?:budget|credits?|spend.limit|insufficient.funds)\b/i.test(message)) reason = 'BUDGET_LIMIT';
+  else if (/\b(?:unauthorized|authentication|invalid.key|permission.denied)\b/i.test(message))
+    reason = 'AUTHORIZATION';
+  const safeCode = (value) => {
+    const code = String(value ?? '');
+    return /^[a-z0-9_.-]{1,48}$/i.test(code) ? code : null;
+  };
+  const code = safeCode(error.code);
+  const providerCode = safeCode(error.metadata?.provider_code);
+  const details = [code && `code=${code}`, providerCode && `provider_code=${providerCode}`].filter(Boolean);
+  return `OpenRouter HTTP ${Number(status) || 'unknown'}; reason=${reason}${details.length ? '; ' + details.join('; ') : ''}. ` +
+    'Исходный текст ошибки скрыт для защиты данных. Если reason=UNKNOWN, требуется приватная диагностика OpenRouter.';
+}
+
 // Pure functions used by the cloud reviewer and its offline tests.
 export class ReviewBlocked extends Error {}
 
