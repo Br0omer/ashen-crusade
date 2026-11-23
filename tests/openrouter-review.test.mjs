@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { blockedReview, buildReviewMessages, ciCommitMatchesHead, contractJobsPassed, describeOpenRouterFailure, isOpenCodeConfigPath, isReviewableSourcePath, MODEL_GENERATION_SETTINGS, OPENCODE_V2_REFERENCE, parseReview, prepareChanges, prepareReviewChunks, combineReviewChunks, renderComment, ReviewBlocked, touchesOpenCodeConfig } from '../.github/scripts/review-core.mjs';
+import { blockedReview, buildReviewMessages, ciCommitMatchesHead, contractJobsPassed, describeOpenRouterFailure, isOpenCodeConfigPath, isReviewableSourcePath, MODEL_GENERATION_SETTINGS, OPENCODE_V2_REFERENCE, parseReview, prepareChanges, prepareReviewChunks, combineReviewChunks, renderComment, ReviewBlocked, touchesOpenCodeConfig, validateApprovedSpec } from '../.github/scripts/review-core.mjs';
 
 const patch = { filename: 'src/player.js', status: 'modified', additions: 2, deletions: 1, patch: '@@ -1 +1 @@\n-old\n+new' };
 
@@ -285,4 +285,14 @@ test('non-window reviews preserve prior contract without invented inventory', ()
   const payload = JSON.parse(user.content);
   assert.equal(Object.hasOwn(payload, 'reviewWindow'), false);
   assert.equal(payload.approvedIncrementSpec, '');
+});
+
+test('approved increment spec reports missing, empty, and valid content distinctly', () => {
+  const filename = 'docs/increments/example.md';
+  assert.throws(() => validateApprovedSpec(filename, null), /Не удалось получить целиком/);
+  assert.throws(() => validateApprovedSpec(filename, ''), /ТЗ пусто/);
+  assert.throws(() => validateApprovedSpec(filename, '  \n'), /ТЗ пусто/);
+  assert.equal(validateApprovedSpec(filename, '## Цель\nПроверить\n'),
+    'FILE: ' + filename + '\n## Цель\nПроверить\n');
+  assert.throws(() => validateApprovedSpec('../arch062/index.html', 'test'), /Некорректный путь/);
 });
