@@ -3,7 +3,7 @@
  * Shell commands have fixed arguments, no shell expansion and no GitHub writes.
  */
 import { spawnSync } from 'node:child_process';
-import { readFileSync, realpathSync } from 'node:fs';
+import { readFileSync, realpathSync, existsSync, lstatSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateBranch, checkChangedFiles, incrementSpecPath } from './git-flow.mjs';
@@ -15,6 +15,7 @@ const TESTS = [
   ['--test', 'tests/openrouter-review.test.mjs'],
   ['--test', 'tests/git-flow.test.mjs'],
   ['--test', 'tests/pipeline-v2.test.mjs'],
+  ['--test', 'tests/browser-preview-smoke.test.mjs'],
 ];
 
 function run(program, args, { allowFailure = false } = {}) {
@@ -105,14 +106,36 @@ function commit() {
   console.log(JSON.stringify({ operation: 'commit', branch, sha: git(['rev-parse', 'HEAD']),
     spec: plan.path, changedFiles: staged, tests: 'PASS', result: 'ready_for_architect' }));
 }
+// Only the exact untracked sidecar of the active increment may be removed.
+// No arbitrary path arguments, globbing, directory deletion or tracked-file removal.
+export function incrementTempPath(name) { return incrementSpecPath(name) + '.tmp'; }
+
+function cleanup() {
+  assertRepo();
+  const path = incrementTempPath(activeBranch());
+  if (!existsSync(path)) {
+    console.log(JSON.stringify({ operation: 'cleanup', result: 'nothing_to_remove', path }));
+    return;
+  }
+  const item = lstatSync(path);
+  if (!item.isFile() || item.isSymbolicLink() || item.size > 4096)
+    throw new Error('Временный файл не является небольшим обычным файлом; очистка запрещена.');
+  const status = run('git', ['status', '--porcelain=v1', '-z', '--untracked-files=all', '--', path]).stdout;
+  if (status !== '?? ' + path + '\0')
+    throw new Error('Удалять можно только неотслеживаемый временный файл текущего инкремента.');
+  unlinkSync(path);
+  console.log(JSON.stringify({ operation: 'cleanup', result: 'removed', path }));
+}
+
 function main() {
   const [command, ...extra] = process.argv.slice(2);
-  if (extra.length) throw new Error('Допустимые команды без аргументов: status | check | commit.');
+  if (extra.length) throw new Error('Допустимые команды без аргументов: status | check | commit | cleanup.');
   if (command === 'status') {
     assertRepo();
     console.log(JSON.stringify({ operation: 'status', branch: git(['branch', '--show-current']),
       workingTree: git(['status', '--short']) }));
-  } else if (command === 'check') {
+  } else if (command === 'cleanup') cleanup();
+  else if (command === 'check') {
     const result = prepare();
     console.log(JSON.stringify({ operation: 'check', branch: result.branch,
       changedFiles: result.paths, spec: result.plan.path, tests: 'PASS' }));

@@ -1,6 +1,6 @@
 # Pipeline V2 — один чат OpenCode
 
-Кандидат. После merge требуется реальная проверка на MacBook в VS Code; CI не проверяет клиент OpenCode.
+Pipeline V2 проверен на первых игровых инкрементах. CI не проверяет сам клиент OpenCode, а игровая приёмка остаётся у владельца.
 
 ## Роли
 Architect — GPT-6.2 Astra (главный чат); Game Designer — Gemini 4 Hydrogen (механики); Developer — Claude Sonnet 5.5 (код); Git Operator — Gemini Hydrogen (чтение); Reviewer + QA — Gemini в GitHub Actions (diff и регрессии). Уже подключённые OpenRouter и GitHub Secret; новые ключи не нужны. Цель — $100/мес., изображения отдельно.
@@ -19,3 +19,10 @@ Architect — GPT-6.2 Astra (главный чат); Game Designer — Gemini 4 
 
 ## Первый сквозной тест
 После merge: VS Code → **Git: Pull** → новая сессия Architect. Убедись, что дизайнер вызывается из той же беседы. Далее согласуй регрессионный тест `RB+RT` в одном тике ARCH-062; менять только `tests/` и `docs/increments/`, **не `arch062/`**. До успешного PR, CI и ревью Gemini интеграция Pipeline V2 не считается проверенной.
+
+## Предпросмотр и проверки
+- `publish` добавляет в игровой PR raw.githack HTTPS-ссылку на полный SHA прототипа; обновляет или удаляет её при новом push.
+- Ссылка — **UNVERIFIED** до CI `Browser preview smoke`: реальный Chromium проверяет героя, Canvas, старт и отсутствие ошибок JS/сети. Игровая приёмка — только на планшете владельца.
+- Gemini проверяет **весь diff** по ограниченным окнам; неполная проверка и ошибка → BLOCKED.
+- `dev-flow.mjs cleanup` удаляет исключительно маленький неотслеживаемый `docs/increments/<ветка>.md.tmp`.
+- После merge повторить проверку B1 PR #14 через `OpenRouter AI review` → `workflow_dispatch` (номер 14).
