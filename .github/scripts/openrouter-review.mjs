@@ -1,4 +1,4 @@
-import { blockedReview, buildReviewMessages, ciCommitMatchesHead, contractJobsPassed, describeOpenRouterFailure, isReviewableSourcePath, MODEL_GENERATION_SETTINGS, parseReview, prepareReviewChunks, combineReviewChunks, renderComment, ReviewBlocked } from './review-core.mjs';
+import { blockedReview, buildReviewMessages, ciCommitMatchesHead, contractJobsPassed, describeOpenRouterFailure, isReviewableSourcePath, MODEL_GENERATION_SETTINGS, parseReview, prepareReviewChunks, combineReviewChunks, renderComment, validateApprovedSpec, ReviewBlocked } from './review-core.mjs';
 
 const repo = process.env.GITHUB_REPOSITORY;
 const token = process.env.GITHUB_TOKEN;
@@ -123,8 +123,7 @@ async function loadApprovedIncrementSpecs(files, pr) {
   const result = [];
   for (const file of specs) {
     const body = await readChangedTextFile(file.filename, pr.head.sha);
-    if (!body) throw new ReviewBlocked('Согласованное ТЗ нельзя загрузить целиком: ' + file.filename);
-    result.push('FILE: ' + file.filename + '\n' + body);
+    result.push(validateApprovedSpec(file.filename, body));
   }
   return result.join('\n\n');
 }
