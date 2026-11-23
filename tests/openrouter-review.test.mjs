@@ -197,3 +197,16 @@ test('OpenRouter errors distinguish region, moderation, guardrails and unknown b
   assert.match(describeOpenRouterFailure(403, '<html>internal provider payload</html>'), /reason=UNKNOWN/);
   assert.doesNotMatch(describeOpenRouterFailure(403, '<html>secret</html>'), /secret/);
 });
+
+
+test('wrapped provider error is classified but metadata.raw never leaves the function', () => {
+  const body = JSON.stringify({ error: { message: 'Provider returned error', code: 403,
+    metadata: { raw: { message: 'Country is not supported', credentials: 'sk-or-v1-private' } } } });
+  const description = describeOpenRouterFailure(403, body);
+  assert.match(description, /reason=REGION_RESTRICTED/);
+  assert.match(description, /code=403/);
+  assert.doesNotMatch(description, /Country is not supported|sk-or-v1-private|credentials/);
+  assert.match(describeOpenRouterFailure(403, JSON.stringify({
+    error: { message: 'Permission denied', code: 403 },
+  })), /reason=AUTHORIZATION/);
+});
