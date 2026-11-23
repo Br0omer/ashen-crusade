@@ -28,3 +28,6 @@ jobs:
         run: node tests/arch062-contract.cjs
       - name: Cloud reviewer offline tests
         run: node --test tests/openrouter-review.test.mjs
+      - name: Git Operator safety tests
+        run: node --test tests/git-flow.test.mjs
+
