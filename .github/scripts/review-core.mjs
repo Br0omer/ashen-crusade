@@ -47,6 +47,18 @@ export function ciCommitMatchesHead(runSha, headSha, parents = []) {
   return runSha === headSha || parents.some((parent) => parent.sha === headSha);
 }
 
+export function contractJobsPassed(jobs) {
+  if (!Array.isArray(jobs)) return false;
+  const core = jobs.find(j => j.name === 'Character visual contracts');
+  if (!core || core.status !== 'completed' || core.conclusion !== 'success') return false;
+  const browser = jobs.find(j => j.name === 'Browser preview smoke');
+  // Older PRs legitimately have no browser job; require the full workflow success
+  // in getCi() and keep their browser launch as an owner acceptance condition.
+  if (browser && (browser.status !== 'completed' || !['success', 'skipped'].includes(browser.conclusion)))
+    return false;
+  return true;
+}
+
 export function prepareChanges(files, { maxFiles = 35, maxPatchChars = 42000 } = {}) {
   if (!Array.isArray(files) || files.length === 0) {
     throw new ReviewBlocked('GitHub не вернул изменённых файлов для PR.');
