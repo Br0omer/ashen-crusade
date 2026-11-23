@@ -71,6 +71,78 @@ export function prepareChanges(files, { maxFiles = 35, maxPatchChars = 42000 } =
   return sections.join('\n\n');
 }
 
+
+/* Lossless, bounded review windows. Every changed patch line is sent to a reviewer;
+ * no partial PASS, missing patches, oversized single lines or silent truncation. */
+export function prepareReviewChunks(files, { maxFiles = 35, maxPatchChars = 28000, maxChunks = 16 } = {}) {
+  if (!Array.isArray(files) || files.length === 0 || files.length > maxFiles)
+    throw new ReviewBlocked('Некорректное количество файлов для независимого ревью.');
+  if (!Number.isInteger(maxPatchChars) || maxPatchChars < 200 ||
+      !Number.isInteger(maxChunks) || maxChunks < 1)
+    throw new ReviewBlocked('Некорректные лимиты разбиения ревью.');
+  const fragments = [];
+  for (const file of files) {
+    if (typeof file.filename !== 'string' || typeof file.patch !== 'string' || !file.patch.length)
+      throw new ReviewBlocked('Нет полного текстового diff для ' + (file.filename || 'файла') + '.');
+    const header = 'FILE: ' + file.filename + '\nSTATUS: ' + file.status +
+      '\n+' + file.additions + '/-' + file.deletions + '\n';
+    const lines = file.patch.match(/[^\n]*\n|[^\n]+$/g) || [];
+    const windows = [];
+    let group = '';
+    // Reserve space for the segment label even for a many-part file.
+    const capacity = maxPatchChars - header.length - 56;
+    if (capacity <= 0) throw new ReviewBlocked('Слишком длинное имя файла для ревью.');
+    for (const line of lines) {
+      if (line.length > capacity)
+        throw new ReviewBlocked('Слишком длинная неделимая строка diff: ' + file.filename);
+      if (group && group.length + line.length > capacity) {
+        windows.push(group); group = '';
+      }
+      group += line;
+    }
+    if (group) windows.push(group);
+    for (let i = 0; i < windows.length; i++) {
+      const diff = header + 'PART: ' + (i + 1) + '/' + windows.length + '\n' + windows[i];
+      if (diff.length > maxPatchChars) throw new ReviewBlocked('Превышен лимит окна ревью.');
+      fragments.push({ file, diff, patch: windows[i] });
+    }
+  }
+  const chunks = [];
+  let current = { files: [], diff: '' };
+  for (const fragment of fragments) {
+    if (current.diff && current.diff.length + fragment.diff.length + 2 > maxPatchChars) {
+      chunks.push(current);
+      current = { files: [], diff: '' };
+    }
+    current.diff += (current.diff ? '\n\n' : '') + fragment.diff;
+    if (!current.files.some(file => file.filename === fragment.file.filename))
+      current.files.push(fragment.file);
+  }
+  if (current.diff) chunks.push(current);
+  if (chunks.length > maxChunks)
+    throw new ReviewBlocked('Для полного ревью нужно ' + chunks.length +
+      ' запросов (максимум ' + maxChunks + '). Нужна ручная проверка.');
+  return chunks;
+}
+
+export function combineReviewChunks(reviews) {
+  if (!Array.isArray(reviews) || !reviews.length)
+    throw new ReviewBlocked('Ни один фрагмент PR не проверен.');
+  const verdict = reviews.some(r => r.verdict === 'BLOCKED') ? 'BLOCKED' :
+    reviews.some(r => r.verdict === 'CHANGES_REQUESTED' ||
+      r.findings?.some(f => f.severity === 'high' || f.severity === 'medium'))
+      ? 'CHANGES_REQUESTED' : 'PASS';
+  const priority = { high: 0, medium: 1, low: 2 };
+  const findings = reviews.flatMap(r => r.findings || [])
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) => (priority[a.item.severity] ?? 1) - (priority[b.item.severity] ?? 1) || a.index - b.index)
+    .slice(0, 15).map(x => x.item);
+  const manualChecks = [...new Set(reviews.flatMap(r => r.manualChecks || []))].slice(0, 8);
+  const summary = 'Фрагментов проверено: ' + reviews.length + '. ' +
+    reviews.map((r, i) => '[' + (i+1) + ': ' + r.verdict + '] ' + (r.summary || '').slice(0, 250)).join(' ');
+  return { verdict, summary: summary.slice(0, 1900), findings, manualChecks };
+}
+
 export function parseReview(raw) {
   if (typeof raw !== 'string' || !raw.trim()) {
     throw new ReviewBlocked('Модель не вернула текстовый результат.');
