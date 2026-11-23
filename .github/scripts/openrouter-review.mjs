@@ -114,6 +114,10 @@ async function sourceContext(files, pr) {
   let total = 0;
   const candidates = files.filter((file) =>
     file.status !== 'removed' && isReviewableSourcePath(file.filename));
+  // Approved increment specs must not be dropped when a PR changes many files.
+  candidates.sort((a, b) =>
+    Number(/^docs\/increments\/[^/]+\.md$/.test(b.filename)) -
+    Number(/^docs\/increments\/[^/]+\.md$/.test(a.filename)));
   for (const file of candidates.slice(0, 7)) {
     try {
       const body = await readChangedTextFile(file.filename, pr.head.sha);

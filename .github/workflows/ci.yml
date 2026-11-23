@@ -30,4 +30,6 @@ jobs:
         run: node --test tests/openrouter-review.test.mjs
       - name: Git Operator safety tests
         run: node --test tests/git-flow.test.mjs
+      - name: Pipeline V2 role and workflow tests
+        run: node --test tests/pipeline-v2.test.mjs
 

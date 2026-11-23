@@ -75,7 +75,7 @@ test('a failed CI check cannot be presented as final PASS', () => {
   assert.equal(answer.verdict, 'BLOCKED');
 });
 
-test('Git approval rules are narrow and ask only in primary Architect', () => {
+test('Pipeline V2 allows only exact Git commands from Architect', () => {
   const rules = (agent) => {
     const raw = readFileSync(new URL(`../.opencode/agents/${agent}.md`, import.meta.url), 'utf8');
     const frontmatter = raw.match(/^---\n([\s\S]*?)\n---/);
@@ -93,16 +93,22 @@ test('Git approval rules are narrow and ask only in primary Architect', () => {
   assert.deepEqual(architect, [
     { action: 'edit', resource: '*', effect: 'deny' },
     { action: 'shell', resource: '*', effect: 'deny' },
-    { action: 'shell', resource: 'node .opencode/scripts/git-flow.mjs status', effect: 'ask' },
-    { action: 'shell', resource: 'node .opencode/scripts/git-flow.mjs start test/arch062-swap-fire', effect: 'ask' },
-    { action: 'shell', resource: 'node .opencode/scripts/git-flow.mjs publish', effect: 'ask' },
+    { action: 'shell', resource: 'node .opencode/scripts/git-flow.mjs status', effect: 'allow' },
+    { action: 'shell', resource: 'node .opencode/scripts/git-flow.mjs start', effect: 'allow' },
+    { action: 'shell', resource: 'node .opencode/scripts/git-flow.mjs start test/arch062-swap-fire', effect: 'allow' },
+    { action: 'shell', resource: 'node .opencode/scripts/git-flow.mjs publish', effect: 'allow' },
+    { action: 'shell', resource: 'node .opencode/scripts/git-flow.mjs report', effect: 'allow' },
     { action: 'subagent', resource: '*', effect: 'deny' },
-    { action: 'subagent', resource: 'developer', effect: 'ask' },
-    { action: 'subagent', resource: 'git-operator', effect: 'ask' },
+    { action: 'subagent', resource: 'game-designer', effect: 'allow' },
+    { action: 'subagent', resource: 'developer', effect: 'allow' },
+    { action: 'subagent', resource: 'git-operator', effect: 'allow' },
   ]);
   assert.ok(!architect.some((x) => x.action === 'shell' && x.resource.includes('*') && x.resource !== '*'),
     'No shell pattern may contain a wildcard that could admit chained commands');
 
+  for (const path of ['art02/index.html', 'art02-fix1/index.html', 'art02-frames/index.html',
+    'art02-gait-study/gait.js', 'art02-armor-study/index.html'])
+    assert.throws(() => checkChangedFiles([path]), /защищённые пути/, path);
   const child = rules('git-operator');
   assert.deepEqual(child, [
     { action: '*', resource: '*', effect: 'deny' },
