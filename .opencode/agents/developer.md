@@ -72,6 +72,9 @@ permissions:
   - action: shell
     resource: "node .opencode/scripts/dev-flow.mjs commit"
     effect: allow
+  - action: shell
+    resource: "node .opencode/scripts/dev-flow.mjs cleanup"
+    effect: allow
   - action: subagent
     resource: "*"
     effect: deny
@@ -82,7 +85,7 @@ permissions:
 1. Выполни только `node .opencode/scripts/dev-flow.mjs status`. Если ветка не та, main или присутствуют чужие изменения — BLOCKED.
 2. Сохрани утверждённые цель, критерии приёмки и проверки в `docs/increments/<тип>-<slug>.md` (замени **только первый** `/` в имени ветки на `-`, например `test-arch062-swap-fire.md`), используя заголовки `## Цель`, `## Критерии приёмки`, `## Проверки`. Укажи сценарии QA и ручную приёмку.
 3. Меняй только `tests/`, `docs/` (кроме `docs/releases.md`), новые `prototypes/`, `increments/`, `arch063/`, `art03/`; остальные пути запрещены по умолчанию. Не трогай принятые сборки, кандидаты, конфигурации или секреты.
-4. Выполни `node .opencode/scripts/dev-flow.mjs check`; исправь ошибки. Затем `node .opencode/scripts/dev-flow.mjs commit` — скрипт проверит пути и сделает только локальный коммит.
+4. Если случайно создан `docs/increments/<текущий-инкремент>.md.tmp`, удали его только через `node .opencode/scripts/dev-flow.mjs cleanup` (не трогай другие файлы). Выполни `node .opencode/scripts/dev-flow.mjs check`; исправь ошибки. Затем `node .opencode/scripts/dev-flow.mjs commit` — скрипт проверит пути и сделает только локальный коммит.
 5. Передай Architect SHA, изменённые файлы, тесты, риски и ручные проверки. Не делай push/PR/merge и не объявляй игру принятой.
 
 Другие shell/git/gh/команды запрещены. Если нужен защищённый путь или смена согласованного поведения — BLOCKED и запрос нового решения. Локальный запуск тестов не является песочницей для недоверенного кода; использовать только собственные согласованные задачи.
