@@ -3,6 +3,7 @@
  * Never merges, force-pushes, deletes branches, or pushes to main.
  */
 import { spawnSync } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { realpathSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,13 +12,25 @@ const REPO = 'Br0omer/ashen-crusade';
 const BRANCH_RE = /^(?:test|fix|feature|chore)\/[a-z0-9][a-z0-9._-]{1,63}$/;
 const RESERVED_FILES = new Set(['AGENTS.md', 'opencode.jsonc', 'index.html', 'docs/releases.md']);
 const RESERVED_DIRS = ['.github/', '.opencode/', 'arch061/', 'arch062/', 'v103/', 'arch03/', 'art01/',
-  'arch01/', 'arch02/', 'arch05/', 'v101/', 'v102/', 'releases/', 'js/', 'assets/'];
+  'arch01/', 'arch02/', 'arch05/', 'v101/', 'v102/', 'releases/', 'js/', 'assets/',
+  'art02/', 'art02-fix1/', 'art02-frames/', 'art02-gait-study/', 'art02-armor-study/'];
 const ROOT_ASSET = /^[^/]+\.(?:html?|[cm]?js|css|svg|png|jpe?g|webp|json)$/i;
 
 export function validateBranch(name) {
   if (typeof name !== 'string' || !BRANCH_RE.test(name) || name.includes('..') || name.endsWith('.lock'))
     throw new Error('Недопустимое имя ветки: нужен префикс test/, fix/, feature/ или chore/ и безопасный slug.');
   return name;
+}
+
+export function autoBranchName(now = new Date(), suffix = randomBytes(4).toString('hex')) {
+  if (!(now instanceof Date) || Number.isNaN(now.getTime()) || !/^[0-9a-f]{8}$/.test(suffix))
+    throw new Error('Некорректные параметры генерации ветки.');
+  return validateBranch('feature/inc-' + now.toISOString().slice(0, 10).replaceAll('-', '') + '-' + suffix);
+}
+
+export function incrementSpecPath(name) {
+  const safe = validateBranch(name);
+  return 'docs/increments/' + safe.replace('/', '-') + '.md';
 }
 
 export function checkChangedFiles(files) {
@@ -117,6 +130,7 @@ function runContracts() {
     ['tests/arch062-contract.cjs'],
     ['--test', 'tests/openrouter-review.test.mjs'],
     ['--test', 'tests/git-flow.test.mjs'],
+    ['--test', 'tests/pipeline-v2.test.mjs'],
   ]) {
     const result = run(process.execPath, args);
     if (result.status !== 0) throw new Error('Тест не пройден: ' + args.join(' '));
@@ -162,10 +176,11 @@ function main() {
   const [action, ...args] = process.argv.slice(2);
   if (action === 'status' && args.length === 0) {
     console.log(JSON.stringify({ operation: 'status', branch: branch(), workingTree: git(['status', '--short']) }));
-  } else if (action === 'start' && args.length === 1) start(args[0]);
+  } else if (action === 'start' && args.length === 0) start(autoBranchName());
+  else if (action === 'start' && args.length === 1) start(args[0]);
   else if (action === 'publish' && args.length === 0) publish();
   else if (action === 'report' && args.length === 0) report();
-  else throw new Error('Допустимые команды: status | start <branch> | publish | report.');
+  else throw new Error('Допустимые команды: status | start [branch] | publish | report.');
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
