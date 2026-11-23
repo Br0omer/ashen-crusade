@@ -72,7 +72,7 @@ function spec(branch) {
   return readIncrementSpec(branch, readFileSync(path, 'utf8'));
 }
 function changedFiles() {
-  const raw = git(['status', '--porcelain=v1', '-z', '--untracked-files=all']);
+  const raw = run('git', ['status', '--porcelain=v1', '-z', '--untracked-files=all']).stdout;
   const paths = changedStatusPaths(raw);
   if (!paths.length) throw new Error('Нет изменений для коммита.');
   checkChangedFiles(paths);
@@ -96,7 +96,7 @@ function commit() {
   const { branch, plan, paths } = prepare();
   // Stage only explicitly validated paths: never git add -A for the whole repository.
   run('git', ['add', '--', ...paths]);
-  const staged = git(['diff', '--cached', '--name-only', '-z']).split('\0').filter(Boolean);
+  const staged = run('git', ['diff', '--cached', '--name-only', '-z']).stdout.split('\0').filter(Boolean);
   checkChangedFiles(staged);
   const prefix = branch.startsWith('test/') ? 'test' : branch.startsWith('fix/') ? 'fix' : 'feat';
   const title = `${prefix}: ${branch.split('/')[1]}`;
