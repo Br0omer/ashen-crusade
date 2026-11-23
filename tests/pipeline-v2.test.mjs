@@ -58,12 +58,13 @@ test('developer requires a meaningful specification with acceptance and tests', 
   assert.throws(() => readIncrementSpec('test/arch062-swap-fire', 'коротко'), /160/);
 });
 
-test('Developer may edit only through protected deny list and invoke fixed local commands', () => {
+test('Developer uses default-deny edits, a safe directory allowlist and fixed commands', () => {
   const items = rules('developer');
-  assert.ok(rule(items, 'edit', '*', 'allow'));
-  for (const p of ['AGENTS.md', 'opencode.jsonc', '.github/**', '.opencode/**', 'docs/releases.md',
-    'arch061/**', 'arch062/**', 'art02-gait-study/**', 'art02-armor-study/**',
-    'js/**', 'assets/**', 'releases/**']) assert.ok(rule(items, 'edit', p, 'deny'), p);
+  assert.ok(rule(items, 'edit', '*', 'deny'));
+  const editAllows = items.filter(x => x.action === 'edit' && x.effect === 'allow').map(x => x.resource);
+  assert.deepEqual(editAllows, ['tests/**', 'docs/**', 'prototypes/**', 'increments/**', 'arch063/**', 'art03/**']);
+  for (const p of ['docs/releases.md', '*secret*', '*token*', '*.env', '*.env.*',
+    '*.pem', '*.key', '*.p12', '*.pfx']) assert.ok(rule(items, 'edit', p, 'deny'), p);
   assert.ok(rule(items, 'shell', '*', 'deny'));
   const shell = items.filter(x => x.action === 'shell' && x.effect === 'allow');
   assert.deepEqual(shell.map(x => x.resource), [
