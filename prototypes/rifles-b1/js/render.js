@@ -10,9 +10,12 @@ function iso(wx,wy){const d=WorldProjection.delta(wx-p.x,wy-p.y);return {x:W/2+d
 function diamond(wx,wy,size,fill,stroke){let q=iso(wx,wy),r=size*.78,h=size*.39;x.beginPath();x.moveTo(q.x,q.y-h);x.lineTo(q.x+r,q.y);x.lineTo(q.x,q.y+h);x.lineTo(q.x-r,q.y);x.closePath();x.fillStyle=fill;x.fill();if(stroke){x.strokeStyle=stroke;x.lineWidth=1;x.stroke()}}
 function deckProp(wx,wy,type){let q=iso(wx,wy);x.save();x.translate(q.x,q.y);if(type===0){x.fillStyle='#151c25';x.fillRect(-23,-22,46,25);x.fillStyle='#59606a';x.fillRect(-20,-27,40,8);x.fillStyle='#987248';x.fillRect(-19,-23,38,3);for(let z=-12;z<=12;z+=12){x.fillStyle='#343a43';x.fillRect(z,-17,7,13)}}else if(type===1){x.fillStyle='#242c34';x.fillRect(-18,-18,36,20);x.fillStyle='#70717a';x.fillRect(-18,-22,36,7);x.fillStyle='#bd894e';x.fillRect(-15,-19,30,3);x.fillStyle='#e7a552';x.fillRect(-5,-28,10,6)}else{ x.fillStyle='#1b242e';x.fillRect(-12,-35,24,38);x.fillStyle='#59616c';x.fillRect(-9,-33,18,31);x.fillStyle='#bd794d';x.fillRect(-6,-27,12,5);x.fillStyle='#f0b76c';x.fillRect(-3,-25,6,3)}x.restore()}
 function pillar(wx,wy){let q=iso(wx,wy),h=53;x.fillStyle='#080a12aa';x.beginPath();x.ellipse(q.x+12,q.y+8,24,9,0,0,7);x.fill();x.fillStyle='#343b4b';x.beginPath();x.moveTo(q.x-13,q.y);x.lineTo(q.x-13,q.y-h);x.lineTo(q.x+1,q.y-h-7);x.lineTo(q.x+1,q.y-7);x.fill();x.fillStyle='#586073';x.beginPath();x.moveTo(q.x+1,q.y-7);x.lineTo(q.x+1,q.y-h-7);x.lineTo(q.x+14,q.y-h);x.lineTo(q.x+14,q.y);x.fill();x.fillStyle='#79808d';x.fillRect(q.x-15,q.y-h-8,30,7);x.fillStyle='#a57a48';x.fillRect(q.x-14,q.y-h-10,28,3)}
-/* A shot keeps the colour it was fired with, even when RB changes the equipped rifle in flight. */
+/* A shot keeps the colour it was fired with, even when RB changes the equipped rifle in flight.
+ * The visible trail is at most .04 s long and never longer than the time the shot has been flying
+ * (profile life minus remaining life), so it never starts behind its own muzzle. Drawing only. */
 function drawShot(s){
-  const lift=s.elevationPx??12,col=s.trail||'#ffcc72',q=iso(s.x,s.y),tail=iso(s.x-s.vx*.04,s.y-s.vy*.04);
+  const flown=Math.max(0,(s.profile?.life??.8)-s.life),tailTime=Math.min(.04,flown);
+  const lift=s.elevationPx??12,col=s.trail||'#ffcc72',q=iso(s.x,s.y),tail=iso(s.x-s.vx*tailTime,s.y-s.vy*tailTime);
   x.save();x.lineCap='round';x.globalAlpha=.55;x.strokeStyle=col;x.lineWidth=3;
   x.beginPath();x.moveTo(tail.x,tail.y-lift);x.lineTo(q.x,q.y-lift);x.stroke();
   x.globalAlpha=1;x.fillStyle=col;x.beginPath();x.arc(q.x,q.y-lift,4,0,7);x.fill();x.restore();

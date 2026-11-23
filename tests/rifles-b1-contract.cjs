@@ -16,12 +16,15 @@ const read=file=>fs.readFileSync(file,'utf8');
 const near=(a,b,msg)=>assert.ok(Math.abs(a-b)<EPS,`${msg}: ${a} vs ${b}`);
 
 /* ---------- environment stubs (graphics readiness only) ---------- */
-function recordingContext(log){
+function recordingContext(log,calls=[]){
   const store={};
   return new Proxy(store,{
     get(target,key){
       if(typeof key==='symbol')return undefined;
       if(key in target)return target[key];
+      if(key==='save')return target[key]=()=>{(target.__stack||(target.__stack=[])).push(['fillStyle','strokeStyle','lineWidth','globalAlpha'].map(k=>[k,target[k]]));};
+      if(key==='restore')return target[key]=()=>{const saved=(target.__stack||[]).pop();if(saved)for(const [k,v] of saved)target[k]=v;};
+      if(key==='moveTo'||key==='lineTo')return target[key]=(px,py)=>{calls.push({op:key,x:px,y:py,strokeStyle:target.strokeStyle});};
       if(key==='getImageData'||key==='createImageData'){
         const make=(a,b,c,d)=>{const w=key==='getImageData'?c:a,h=key==='getImageData'?d:b;return {data:new Uint8ClampedArray(w*h*4),width:w,height:h};};
         return target[key]=make;
@@ -41,11 +44,11 @@ const ARCH_SCRIPTS=['core.js','input.js','projection.js','composite-definition.j
 /* kind 'arch062': the accepted build (reference). kind 'rifles': exactly the scripts listed in the prototype page. */
 async function createGame({kind,aim={x:1,y:0},seed=20261123}){
   const gamepad={axes:[0,0,aim.x,aim.y],buttons:Array.from({length:10},()=>({pressed:false}))};
-  const elements=new Map(),imageSrcs=[],paints=[];
+  const elements=new Map(),imageSrcs=[],paints=[],calls=[];
   const getElementById=id=>{if(!elements.has(id))elements.set(id,stubElement());return elements.get(id);};
   function stubElement(){
     return {style:{},textContent:'',disabled:false,onclick:null,src:'',width:0,height:0,dataset:{},
-      addEventListener(){},getContext:()=>recordingContext(paints),toDataURL:()=>'data:image/png;base64,'};
+      addEventListener(){},getContext:()=>recordingContext(paints,calls),toDataURL:()=>'data:image/png;base64,'};
   }
   const defName=kind==='rifles'?'RIFLES_HERO_DEFINITION':'COMPOSITE_HERO_DEFINITION';
   let context;
@@ -75,7 +78,7 @@ async function createGame({kind,aim={x:1,y:0},seed=20261123}){
   await Promise.resolve();
   assert.equal(ev('characterVisual.getStatus()'),'ready',kind+': graphics must be ready');
   ev('spawn=1e9');
-  const g={context,ev,gamepad,elements,imageSrcs,paints,files,
+  const g={context,ev,gamepad,elements,imageSrcs,paints,calls,files,
     json:code=>JSON.parse(ev(`JSON.stringify(${code})`)),
     set(button,value){gamepad.buttons[button].pressed=value;},
     update(dt=DT){ev(`update(${dt})`);},
@@ -504,6 +507,47 @@ async function flashAndColours(){
   assert.ok(hue(a)>=30&&hue(a)<=50,'A is amber');assert.ok(hue(b)>=160&&hue(b)<=190,'B1 is turquoise');
   return 'flash and colours';
 }
+/* Regression: the visible trail must never start behind the muzzle. The exact Canvas start/end points of
+ * the trail segment are recorded and compared with an independently computed iso projection + elevation. */
+async function trailGeometry(){
+  const W=1280,H=800;                                  // sandbox innerWidth/innerHeight
+  const isoPoint=(wx,wy,root,lift)=>({x:W/2+((wx-root.x)-(wy-root.y))*.78,y:H/2+((wx-root.x)+(wy-root.y))*.39-lift});
+  let checked=0;
+  for(const weapon of ['rifle-default','rifle-long'])for(const aim of [{x:.6,y:-.3},{x:-.7,y:.25}]){
+    const label=`${weapon} aim ${JSON.stringify(aim)}`,colour=PROFILE_OF[weapon].trail;
+    const g=await createGame({kind:'rifles',aim});g.clear();
+    g.ev(`p.x=${START.x};p.y=${START.y};p.weaponId='${weapon}';prepareCharacterPose()`);
+    g.set(BTN.RT,true);g.update();g.set(BTN.RT,false);
+    const muzzle=g.json("characterVisual.getSocket('muzzle')"),root={x:START.x,y:START.y};
+    const origin={x:muzzle.x,y:muzzle.y},lift=muzzle.elevationPx;
+    assert.equal(lift,12,'projectile elevation');
+    const full=780*.04;
+    for(let frame=1;frame<=9;frame++){
+      const s=g.json('({x:shots[0].x,y:shots[0].y,vx:shots[0].vx,vy:shots[0].vy})'),speed=Math.hypot(s.vx,s.vy);
+      const travelled=Math.hypot(s.x-origin.x,s.y-origin.y);
+      assert.ok(Math.abs(travelled-speed*DT*frame)<1e-6,`${label} frame ${frame}: travelled distance`);
+      const length=Math.min(full,travelled),dir={x:s.vx/speed,y:s.vy/speed};
+      g.calls.length=0;g.ev('render()');
+      const drawn=g.calls.filter(c=>c.strokeStyle===colour);
+      assert.equal(drawn.length,2,`${label} frame ${frame}: exactly one trail segment`);
+      assert.equal(drawn[0].op,'moveTo');assert.equal(drawn[1].op,'lineTo');
+      const start={x:drawn[0].x,y:drawn[0].y},end={x:drawn[1].x,y:drawn[1].y};
+      const wantEnd=isoPoint(s.x,s.y,root,lift),wantStart=isoPoint(s.x-dir.x*length,s.y-dir.y*length,root,lift),muzzleOnScreen=isoPoint(origin.x,origin.y,root,lift);
+      near(end.x,wantEnd.x,`${label} frame ${frame} end.x`);near(end.y,wantEnd.y,`${label} frame ${frame} end.y`);
+      near(start.x,wantStart.x,`${label} frame ${frame} start.x`);near(start.y,wantStart.y,`${label} frame ${frame} start.y`);
+      // never behind the muzzle: the start lies on the muzzle->head segment (screen space)
+      const ax=end.x-muzzleOnScreen.x,ay=end.y-muzzleOnScreen.y,bx=start.x-muzzleOnScreen.x,by=start.y-muzzleOnScreen.y;
+      assert.ok(ax*bx+ay*by>=-1e-6,`${label} frame ${frame}: trail starts behind the muzzle`);
+      assert.ok(Math.hypot(bx,by)<=Math.hypot(ax,ay)+1e-6);
+      if(travelled<full)near(Math.hypot(start.x-muzzleOnScreen.x,start.y-muzzleOnScreen.y),0,`${label} frame ${frame}: short trail starts at the muzzle`);
+      else near(Math.hypot(end.x-start.x,end.y-start.y),Math.hypot(isoPoint(dir.x*full,dir.y*full,{x:0,y:0},0).x-W/2,isoPoint(dir.x*full,dir.y*full,{x:0,y:0},0).y-H/2),`${label} frame ${frame}: full .04 s trail length`);
+      checked++;
+      g.update();
+    }
+  }
+  assert.equal(checked,36);
+  return 'trail geometry';
+}
 async function restart(){
   const g=await createGame({kind:'rifles'});g.clear();g.ev("p.weaponId='rifle-long'");
   g.set(BTN.RT,true);g.update();g.set(BTN.RT,false);
@@ -553,7 +597,7 @@ function permutations(list){
 
 async function run(){
   const steps=[staticChecks,fidelityChecks,profileAndGeometry,parity,levels,reverseOrder,tunnelling,entryOrder,ties,uniqueness,rangeLimit,twoShots,
-    swapFire,cooldownsAndHold,pauseBlocks,swapInFlight,flashAndColours,restart,pageResources];
+    swapFire,cooldownsAndHold,pauseBlocks,swapInFlight,flashAndColours,trailGeometry,restart,pageResources];
   const done=[];
   for(const step of steps)done.push(await step());
   console.log('PASS: RIFLES-B1 contract: '+done.join(', ')+'.');
