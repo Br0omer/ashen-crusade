@@ -1,22 +1,16 @@
-# Pipeline V2 — browser previews and bounded cloud review
+# Pipeline V2 — tablet previews and cloud review
 
 ## Цель
-Устранить блокировку больших игровых PR при ревью и обеспечить безопасную ссылку для проверки сборок на планшете.
+Безопасно публиковать SHA-ссылку на игровой прототип и полноценно проверять большие PR без изменения принятых сборок.
 
 ## Критерии приёмки
-- Не меняются принятые сборки, включая arch062/, art02 и прототип B1 PR #14.
-- Gemini получает полный diff крупного PR через последовательные окна; любой сбой или замечание сохраняет блокировку merge. Лимит запросов ограничен.
-- Для игрового PR с prototypes/<slug>/ создаётся SHA-зависимая HTTPS-ссылка в описании PR, обновляется при изменении SHA без изменения остальных разделов.
-- Отдельный непривилегированный CI smoke-test использует Chromium на HTTPS-странице, проверяет загрузку героя, Canvas-превью, активную кнопку и переход к игре. Проверка доступности файлов не подменяет браузерную проверку.
-- Developer может удалить только свой маленький неотслеживаемый docs/increments/*.md.tmp через явную фиксированную команду.
-- Merge и игровая приёмка исключительно вручную, без изменений секретов и конфигурации публикации.
+- Для prototypes/<slug>/ ссылка в PR указывает на полный SHA, обновляется при push и удаляется при удалении прототипа.
+- CI Chromium проверяет HTTPS-загрузку героя, Canvas-превью, доступность старта и запуск без ошибок JS/сети.
+- Gemini проверяет весь diff по ограниченным окнам; любой сбой/замечание блокирует общий PASS.
+- Developer удаляет только свой маленький неотслеживаемый .md.tmp. Игровая приёмка и merge — у владельца.
+- arch062/, принятые сборки, B1 PR #14, секреты и настройки Pages не изменяются.
 
 ## Проверки
-- node tests/arch061-contract.cjs
-- node tests/arch062-contract.cjs
-- node --test tests/openrouter-review.test.mjs
-- node --test tests/git-flow.test.mjs
-- node --test tests/pipeline-v2.test.mjs
-- node --test tests/browser-preview-smoke.test.mjs
-- GitHub Actions: Contract tests, Browser preview smoke (если PR меняет prototype)
-- Облачное ревью Gemini для SHA PR; после merge ручной workflow_dispatch повторно проверит B1 PR #14.
+- Существующие ARCH-061/ARCH-062 контракты; reviewer/git-flow/pipeline unit tests.
+- Новые offline smoke/preview/cleanup тесты; GitHub CI и ревью Gemini.
+- Browser smoke на первом игровом PR, повторный workflow_dispatch ревью PR #14 после merge.
