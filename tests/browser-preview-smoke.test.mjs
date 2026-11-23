@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { changedPrototypePages, previewUrl } from './browser-preview-smoke.mjs';
+import { changedPrototypePages, previewUrl, assertBrowserHealthy } from './browser-preview-smoke.mjs';
 
 test('only changed prototypes with index pages are smoke-tested', () => {
   const names = changedPrototypePages([
@@ -18,4 +18,10 @@ test('preview URLs are immutable SHA-pinned and reject path traversal', () => {
   assert.throws(() => previewUrl('main', 'prototypes/rifles-b1/index.html'));
   assert.throws(() => previewUrl(sha, '../arch062/index.html'));
   assert.throws(() => previewUrl(sha, 'prototypes/../index.html'));
+});
+
+test('runtime exceptions and failed asset requests prevent browser smoke PASS', () => {
+  assert.doesNotThrow(() => assertBrowserHealthy([]));
+  assert.throws(() => assertBrowserHealthy(['Uncaught Error: render failed']), /render failed/);
+  assert.throws(() => assertBrowserHealthy(['request failed: hero-approved.webp ERR_CORS']), /ERR_CORS/);
 });
