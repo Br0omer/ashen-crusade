@@ -162,6 +162,7 @@ function runContracts() {
     ['--test', 'tests/openrouter-review.test.mjs'],
     ['--test', 'tests/git-flow.test.mjs'],
     ['--test', 'tests/pipeline-v2.test.mjs'],
+    ['--test', 'tests/browser-preview-smoke.test.mjs'],
   ]) {
     const result = run(process.execPath, args);
     if (result.status !== 0) throw new Error('Тест не пройден: ' + args.join(' '));
