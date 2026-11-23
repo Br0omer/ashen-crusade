@@ -1,4 +1,4 @@
-import { blockedReview, buildReviewMessages, ciCommitMatchesHead, describeOpenRouterFailure, isReviewableSourcePath, MODEL_GENERATION_SETTINGS, parseReview, prepareReviewChunks, combineReviewChunks, renderComment, ReviewBlocked } from './review-core.mjs';
+import { blockedReview, buildReviewMessages, ciCommitMatchesHead, contractJobsPassed, describeOpenRouterFailure, isReviewableSourcePath, MODEL_GENERATION_SETTINGS, parseReview, prepareReviewChunks, combineReviewChunks, renderComment, ReviewBlocked } from './review-core.mjs';
 
 const repo = process.env.GITHUB_REPOSITORY;
 const token = process.env.GITHUB_TOKEN;
@@ -71,6 +71,13 @@ async function ciRunCoversCurrentHead(run, pr) {
   }
 }
 
+async function ciJobsVerified(run) {
+  if (run?.conclusion !== 'success' || !Number.isInteger(run.id)) return false;
+  const result = await github(`${prefix}/actions/runs/${run.id}/jobs?per_page=100`);
+  if (!Array.isArray(result.jobs) || result.total_count > 100) return false;
+  return contractJobsPassed(result.jobs);
+}
+
 async function getCi(pr) {
   if (event.workflow_run) {
     const run = event.workflow_run;
@@ -82,7 +89,7 @@ async function getCi(pr) {
     if (!(await ciRunCoversCurrentHead(run, pr))) {
       return { conclusion: 'stale', url: run.html_url };
     }
-    return { conclusion: run.conclusion, url: run.html_url };
+    return { conclusion: await ciJobsVerified(run) ? 'success' : 'unverified', url: run.html_url };
   }
 
   // Manual rechecks are permitted only when the corresponding PR CI is verified.
@@ -97,7 +104,7 @@ async function getCi(pr) {
     }
   }
   return matching
-    ? { conclusion: matching.conclusion || 'pending', url: matching.html_url }
+    ? { conclusion: await ciJobsVerified(matching) ? 'success' : 'unverified', url: matching.html_url }
     : { conclusion: 'unverified', url: '' };
 }
 
