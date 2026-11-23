@@ -47,6 +47,16 @@ export function ciCommitMatchesHead(runSha, headSha, parents = []) {
   return runSha === headSha || parents.some((parent) => parent.sha === headSha);
 }
 
+export function validateApprovedSpec(filename, body) {
+  if (typeof filename !== 'string' || !/^docs\/increments\/[^/]+\.md$/.test(filename))
+    throw new ReviewBlocked('Некорректный путь согласованного ТЗ.');
+  if (body === null || typeof body !== 'string')
+    throw new ReviewBlocked('Не удалось получить целиком согласованное ТЗ: ' + filename);
+  if (!body.trim())
+    throw new ReviewBlocked('Согласованное ТЗ пусто: ' + filename);
+  return 'FILE: ' + filename + '\n' + body;
+}
+
 export function contractJobsPassed(jobs) {
   if (!Array.isArray(jobs)) return false;
   const core = jobs.find(j => j.name === 'Character visual contracts');
