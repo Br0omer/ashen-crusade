@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { blockedReview, buildReviewMessages, ciCommitMatchesHead, describeOpenRouterFailure, isOpenCodeConfigPath, isReviewableSourcePath, MODEL_GENERATION_SETTINGS, OPENCODE_V2_REFERENCE, parseReview, prepareChanges, renderComment, ReviewBlocked, touchesOpenCodeConfig } from '../.github/scripts/review-core.mjs';
+import { blockedReview, buildReviewMessages, ciCommitMatchesHead, describeOpenRouterFailure, isOpenCodeConfigPath, isReviewableSourcePath, MODEL_GENERATION_SETTINGS, OPENCODE_V2_REFERENCE, parseReview, prepareChanges, prepareReviewChunks, combineReviewChunks, renderComment, ReviewBlocked, touchesOpenCodeConfig } from '../.github/scripts/review-core.mjs';
 
 const patch = { filename: 'src/player.js', status: 'modified', additions: 2, deletions: 1, patch: '@@ -1 +1 @@\n-old\n+new' };
 
@@ -209,4 +209,39 @@ test('wrapped provider error is classified but metadata.raw never leaves the fun
   assert.match(describeOpenRouterFailure(403, JSON.stringify({
     error: { message: 'Permission denied', code: 403 },
   })), /reason=AUTHORIZATION/);
+});
+
+test('large PR is reviewed in lossless bounded windows without omitting files', () => {
+  const files = [
+    { ...patch, filename: 'prototypes/rifles-b1/js/gameplay.js', patch: '@@ -1 +1 @@\n' + Array.from({ length: 120 }, (_, i) => '+const step' + i + ' = ' + i + ';\n').join('') },
+    { ...patch, filename: 'tests/rifles-b1-contract.cjs', patch: '@@ -1 +1 @@\n' + Array.from({ length: 110 }, (_, i) => '+test(' + i + ');\n').join('') },
+  ];
+  const windows = prepareReviewChunks(files, { maxPatchChars: 950, maxChunks: 20 });
+  assert.ok(windows.length > 2);
+  for (const w of windows) assert.ok(w.diff.length <= 950);
+  for (const file of files) {
+    const parts = windows.flatMap(w => [...w.diff.matchAll(
+      new RegExp('FILE: ' + file.filename.replace(/[.*+?^$`{}()|[\]\\]/g, '\\$&') +
+        '[^]*?PART: [0-9]+/[0-9]+\\n([^]*?)(?=\\n\\nFILE: |$)', 'g'))].map(m => m[1]));
+    assert.ok(parts.length, 'missing file ' + file.filename);
+    assert.equal(parts.join('').replaceAll('\n\n', ''), file.patch);
+  }
+});
+
+test('large or unsupported patch fails closed rather than approving omitted code', () => {
+  assert.throws(() => prepareReviewChunks([{ ...patch, patch: undefined }]), ReviewBlocked);
+  assert.throws(() => prepareReviewChunks([{ ...patch, patch: 'A'.repeat(1000) }], { maxPatchChars: 500 }), ReviewBlocked);
+  assert.throws(() => prepareReviewChunks(Array(36).fill(patch)), ReviewBlocked);
+});
+
+test('review aggregation preserves blocking findings across every window', () => {
+  const ok = { verdict: 'PASS', summary: 'Без ошибок', findings: [], manualChecks: ['Планшет'] };
+  const high = { verdict: 'CHANGES_REQUESTED', summary: 'Ошибка', findings: [
+    { severity: 'high', file: 'gameplay.js', problem: 'Пропущен урон', fix: 'Исправить' }], manualChecks: [] };
+  const blocked = { verdict: 'BLOCKED', summary: 'API unavailable', findings: [], manualChecks: [] };
+  assert.equal(combineReviewChunks([ok, high]).verdict, 'CHANGES_REQUESTED');
+  assert.equal(combineReviewChunks([ok, blocked]).verdict, 'BLOCKED');
+  assert.equal(combineReviewChunks([ok, ok]).verdict, 'PASS');
+  assert.equal(combineReviewChunks([ok, high]).findings[0].severity, 'high');
+  assert.throws(() => combineReviewChunks([]), ReviewBlocked);
 });
