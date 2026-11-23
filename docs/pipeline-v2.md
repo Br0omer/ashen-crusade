@@ -20,9 +20,9 @@ Architect — GPT-6.2 Astra (главный чат); Game Designer — Gemini 4 
 ## Первый сквозной тест
 После merge: VS Code → **Git: Pull** → новая сессия Architect. Убедись, что дизайнер вызывается из той же беседы. Далее согласуй регрессионный тест `RB+RT` в одном тике ARCH-062; менять только `tests/` и `docs/increments/`, **не `arch062/`**. До успешного PR, CI и ревью Gemini интеграция Pipeline V2 не считается проверенной.
 
-## Проверка игровых PR на планшете
-- `git-flow.mjs publish` добавляет в PR ссылку raw.githack на `prototypes/<slug>/index.html` с полным SHA; при повторном push обновляет или удаляет управляемый раздел ссылки.
-- URL по умолчанию **UNVERIFIED**. `Browser preview smoke` в непривилегированном CI открывает реальный Chromium по HTTPS и проверяет загрузку героя, превью, кнопку и игровой старт; HTTP 200 недостаточно. **Игровая приёмка — только у владельца** на Galaxy Tab S9+.
-- Gemini рассматривает **весь** diff ограниченными окнами: общий PASS возможен только при успешном ревью каждой части. Ошибка, недоступный patch или превышение ограниченного числа окон — BLOCKED.
-- Developer может удалить лишь неотслеживаемый `docs/increments/<текущая-ветка>.md.tmp` командой `node .opencode/scripts/dev-flow.mjs cleanup`; без произвольного удаления.
-- После merge инфраструктурного PR повторить ревью старого PR #14 через GitHub Actions → `OpenRouter AI review` → `workflow_dispatch` с номером 14. Старый BLOCKED не исчезает сам.
+## Предпросмотр и проверки
+- `publish` добавляет в игровой PR raw.githack HTTPS-ссылку на полный SHA прототипа; обновляет или удаляет её при новом push.
+- Ссылка — **UNVERIFIED** до CI `Browser preview smoke`: реальный Chromium проверяет героя, Canvas, старт и отсутствие ошибок JS/сети. Игровая приёмка — только на планшете владельца.
+- Gemini проверяет **весь diff** по ограниченным окнам; неполная проверка и ошибка → BLOCKED.
+- `dev-flow.mjs cleanup` удаляет исключительно маленький неотслеживаемый `docs/increments/<ветка>.md.tmp`.
+- После merge повторить проверку B1 PR #14 через `OpenRouter AI review` → `workflow_dispatch` (номер 14).
