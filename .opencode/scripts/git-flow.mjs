@@ -4,7 +4,7 @@
  */
 import { spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { realpathSync } from 'node:fs';
+import { realpathSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -39,6 +39,37 @@ export function checkChangedFiles(files) {
     /(?:^|\/)\.env(?:\.|$)/i.test(p) || p.split('/').includes('..') || /[\x00-\x1f]/.test(p));
   if (blocked.length) throw new Error('Изменены защищённые пути: ' + blocked.join(', ') + '. Нужен отдельный согласованный процесс.');
   return files;
+}
+
+
+export function tabletPreviewSection(paths, sha, hasIndex = (path) => existsSync(path)) {
+  if (!Array.isArray(paths) || !/^[0-9a-f]{40}$/i.test(sha))
+    throw new Error('Некорректные входные данные предпросмотра.');
+  const names = [...new Set(paths.map(path => /^prototypes\/([a-z0-9-]+)\//.exec(path)?.[1]).filter(Boolean))];
+  const links = names.filter(name => hasIndex('prototypes/' + name + '/index.html'));
+  if (!links.length) return '';
+  return [
+    '<!-- ashen-tablet-preview:start -->',
+    '## 🎮 Тестирование на планшете',
+    '',
+    ...links.map(name => '- **Открыть ' + name + ':** https://raw.githack.com/' + REPO + '/' + sha + '/prototypes/' + name + '/index.html'),
+    '- **Commit SHA:** `' + sha + '`',
+    '- **Статус ссылки:** UNVERIFIED — URL сформирован; реальную загрузку подтверждает браузерный smoke-test в CI.',
+    '- **Игровая приёмка:** PENDING до проверки владельцем на Galaxy Tab S9+ и Xbox Controller.',
+    '- **Ручная проверка:** герой загружается, кнопка старта доступна, ввод и игровые механики работают.',
+    '<!-- ashen-tablet-preview:end -->',
+  ].join('\n');
+}
+
+export function replaceTabletPreview(body, section) {
+  const start = '<!-- ashen-tablet-preview:start -->';
+  const end = '<!-- ashen-tablet-preview:end -->';
+  if (!section) return body;
+  if (!body.includes(start) && !body.includes(end)) return body.trimEnd() + '\n\n' + section;
+  if (body.split(start).length !== 2 || body.split(end).length !== 2 ||
+      body.indexOf(end) < body.indexOf(start))
+    throw new Error('Повреждён раздел предпросмотра PR; автоматическое обновление остановлено.');
+  return body.slice(0, body.indexOf(start)) + section + body.slice(body.indexOf(end) + end.length);
 }
 
 export function checkWorkingTree(porcelain) {
@@ -145,17 +176,22 @@ function publish() {
   const commits = Number(git(['rev-list', '--count', 'origin/main..HEAD']));
   if (!Number.isInteger(commits) || commits < 1) throw new Error('Нет коммитов в рабочей ветке.');
   const { title, body } = commitDetails(git(['log', '-1', '--format=%B']));
+  const tablet = tabletPreviewSection(paths, git(['rev-parse', 'HEAD']));
   requireGithubCLI();
   runContracts();
   git(['push', '--set-upstream', 'origin', `HEAD:refs/heads/${name}`]);
-  const existing = run('gh', ['pr', 'view', name, '--repo', REPO, '--json', 'number,url,state'], { allowFailure: true });
+  const existing = run('gh', ['pr', 'view', name, '--repo', REPO, '--json', 'number,url,state,body'], { allowFailure: true });
   let result;
   const previous = existing.status === 0 ? JSON.parse(existing.stdout) : null;
   if (isOpenPullRequest(previous)) {
+    if (tablet) {
+      const updated = replaceTabletPreview(previous.body || '', tablet);
+      if (updated !== previous.body) run('gh', ['pr', 'edit', name, '--repo', REPO, '--body', updated]);
+    }
     result = previous;
   } else {
     const url = run('gh', ['pr', 'create', '--repo', REPO, '--base', 'main', '--head', name,
-      '--title', title, '--body', `${body}\n\n---\nАвтоматически создано Git Operator. CI и независимое ревью обязательны. Merge — только по решению владельца.`]).stdout.trim();
+      '--title', title, '--body', `${body}\n\n---\nАвтоматически создано Git Operator. CI и независимое ревью обязательны. Merge — только по решению владельца.${tablet ? '\n\n' + tablet : ''}`]).stdout.trim();
     result = { url };
   }
   console.log(JSON.stringify({ operation: 'publish', branch: name, changedFiles: paths, ...result }));
