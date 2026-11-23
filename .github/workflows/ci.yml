@@ -48,12 +48,15 @@ jobs:
       - name: Checkout PR merge commit (read-only)
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
           persist-credentials: false
       - name: Detect changed browser prototypes
         id: detect
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          if git diff --name-only HEAD^1 HEAD^2 | grep -Eq '^prototypes/[a-z0-9-]+/'; then
+          if git diff --name-only "$PR_BASE_SHA...$PR_HEAD_SHA" | grep -Eq '^prototypes/[a-z0-9-]+/'; then
             echo "preview=true" >> "$GITHUB_OUTPUT"
           else
             echo "preview=false" >> "$GITHUB_OUTPUT"
@@ -72,4 +75,5 @@ jobs:
         if: steps.detect.outputs.preview == 'true'
         env:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: node tests/browser-preview-smoke.mjs
