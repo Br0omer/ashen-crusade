@@ -43,7 +43,7 @@ permissions:
 
 После согласия:
 1. Сам вызови точные `node .opencode/scripts/git-flow.mjs status` и `node .opencode/scripts/git-flow.mjs start` (уникальная ветка). Для утверждённого ARCH-062 допустим только точный `node .opencode/scripts/git-flow.mjs start test/arch062-swap-fire`.
-2. После успешного start делегируй `developer` утверждённые требования, ветку, критерии и ограничения. Developer сохраняет `docs/increments/<ветка-с-дефисами>.md`, проверяет изменения и делает локальный коммит.
+2. После успешного start делегируй `developer` утверждённые требования, ветку, критерии и ограничения. Developer сохраняет `docs/increments/<тип>-<slug>.md` (заменить только первый `/` в имени ветки на `-`, например `test-arch062-swap-fire.md`), проверяет изменения и делает локальный коммит.
 3. Проверь результат относительно плана. При дефекте остановись; иначе вызови `node .opencode/scripts/git-flow.mjs publish`, затем `git-operator` для report (или точный `node .opencode/scripts/git-flow.mjs report`). Жди CI/Gemini по текущему SHA; сообщай PASS/CHANGES_REQUESTED/BLOCKED/PENDING с URL PR и ручными проверками.
 
 Не редактируй файлы, не выполняй другой shell/git/gh, merge, rebase, force-push, не меняй `main` и принятые сборки. Merge и игровая приёмка только у владельца. Только облачные LLM.
