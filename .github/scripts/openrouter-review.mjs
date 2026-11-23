@@ -116,6 +116,19 @@ async function readChangedTextFile(path, ref) {
   return body.includes('\u0000') ? null : body;
 }
 
+
+async function loadApprovedIncrementSpecs(files, pr) {
+  const specs = files.filter(f => f.status !== 'removed' &&
+    /^docs\/increments\/[^/]+\.md$/.test(f.filename));
+  const result = [];
+  for (const file of specs) {
+    const body = await readChangedTextFile(file.filename, pr.head.sha);
+    if (!body) throw new ReviewBlocked('Согласованное ТЗ нельзя загрузить целиком: ' + file.filename);
+    result.push('FILE: ' + file.filename + '\n' + body);
+  }
+  return result.join('\n\n');
+}
+
 async function sourceContext(files, pr) {
   const sources = [];
   let total = 0;
@@ -138,17 +151,14 @@ async function sourceContext(files, pr) {
   return sources.join('\n\n');
 }
 
-async function requestReview(pr, files, diff, context, part, totalParts) {
+async function requestReview(pr, files, diff, context, scope, approvedSpec) {
   const [agents, roadmap, releases] = await Promise.all([
     readFile('AGENTS.md', 'utf8'),
     readFile('docs/roadmap.md', 'utf8'),
     readFile('docs/releases.md', 'utf8'),
   ]);
-  const messages = buildReviewMessages({ pr, files, diff, sources: context, agents, roadmap, releases });
-  // The model sees only its bounded window; aggregation runs only after all windows return.
-  const payload = JSON.parse(messages[1].content);
-  payload.reviewWindow = { index: part, total: totalParts, scope: 'Review ALL included diff lines, do not assume other windows passed.' };
-  messages[1].content = JSON.stringify(payload);
+  const messages = buildReviewMessages({ pr, files, diff, sources: context, agents, roadmap,
+    releases, scope, approvedSpec });
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -232,11 +242,17 @@ if (ci.conclusion !== 'success') {
   try {
     const files = await getAllChangedFiles(pr.number);
     const windows = prepareReviewChunks(files);
-    const context = await sourceContext(files, pr);
+    const approvedSpec = await loadApprovedIncrementSpecs(files, pr);
+    const inventory = files.map(f => ({ path: f.filename, status: f.status }));
     const results = [];
     for (let i = 0; i < windows.length; i++) {
       try {
-        results.push(await requestReview(pr, windows[i].files, windows[i].diff, context, i + 1, windows.length));
+        const scope = { index: i + 1, total: windows.length, allChangedFiles: inventory,
+          currentWindowFiles: windows[i].files.map(f => f.filename) };
+        // Context only for the active window. The complete approved spec is always
+        // present as a separate field and cannot be silently lost to the size cap.
+        const context = await sourceContext(windows[i].files, pr);
+        results.push(await requestReview(pr, windows[i].files, windows[i].diff, context, scope, approvedSpec));
       } catch (error) {
         // Fail closed: one rejected/unfinished review cannot turn the full PR green.
         results.push(blockedReview('Окно ' + (i + 1) + '/' + windows.length + ': ' +
