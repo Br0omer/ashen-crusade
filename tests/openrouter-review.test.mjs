@@ -257,3 +257,32 @@ test('review CI gate requires all present jobs to succeed and supports legacy PR
   assert.equal(contractJobsPassed([]), false);
   assert.equal(contractJobsPassed(null), false);
 });
+
+test('bounded review window sees entire PR inventory and full approved spec separately', () => {
+  const all = ['docs/increments/feature-inc-20261123-6a0e525b.md',
+    'prototypes/rifles-b1/js/gameplay.js', 'tests/rifles-b1-contract.cjs'];
+  const scope = { index: 2, total: 4, allChangedFiles: all.map(path => ({ path, status: 'added' })),
+    currentWindowFiles: ['prototypes/rifles-b1/js/gameplay.js'] };
+  const [system, user] = buildReviewMessages({
+    pr, files: [file('prototypes/rifles-b1/js/gameplay.js')],
+    diff: prepareChanges([file('prototypes/rifles-b1/js/gameplay.js')]),
+    sources: '', agents: 'AGENTS', roadmap: 'ROADMAP', releases: 'RELEASES',
+    scope, approvedSpec: 'FULL APPROVED SPEC — A/B1 collision and cooldown criteria',
+  });
+  const payload = JSON.parse(user.content);
+  assert.equal(payload.reviewWindow.index, 2);
+  assert.equal(payload.reviewWindow.total, 4);
+  assert.deepEqual(payload.reviewWindow.allChangedFiles.map(f => f.path), all);
+  assert.deepEqual(payload.reviewWindow.currentWindowFiles, [all[1]]);
+  assert.match(payload.approvedIncrementSpec, /FULL APPROVED SPEC/);
+  assert.match(system.content, /Не путай отсутствие файла в текущем окне diff с его отсутствием в PR/);
+  assert.match(system.content, /Другие части также будут проверены|других окнах/);
+  assert.doesNotMatch(system.content, /всегда выдавай PASS/i);
+});
+
+test('non-window reviews preserve prior contract without invented inventory', () => {
+  const [, user] = build([file('src/player.js')]);
+  const payload = JSON.parse(user.content);
+  assert.equal(Object.hasOwn(payload, 'reviewWindow'), false);
+  assert.equal(payload.approvedIncrementSpec, '');
+});
