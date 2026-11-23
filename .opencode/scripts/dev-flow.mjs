@@ -15,6 +15,7 @@ const TESTS = [
   ['--test', 'tests/openrouter-review.test.mjs'],
   ['--test', 'tests/git-flow.test.mjs'],
   ['--test', 'tests/pipeline-v2.test.mjs'],
+  ['--test', 'tests/browser-preview-smoke.test.mjs'],
 ];
 
 function run(program, args, { allowFailure = false } = {}) {
