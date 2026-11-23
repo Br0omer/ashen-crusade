@@ -19,6 +19,11 @@ export function previewUrl(sha, page, repo = 'Br0omer/ashen-crusade') {
   return 'https://raw.githack.com/' + repo + '/' + sha + '/' + page;
 }
 
+export function assertBrowserHealthy(errors) {
+  if (!Array.isArray(errors)) throw new TypeError('Browser error list is required');
+  if (errors.length) throw new Error('Page/network errors: ' + errors.slice(0, 12).join('; '));
+}
+
 async function smoke(url) {
   const { chromium } = await import('playwright');
   const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
@@ -52,9 +57,14 @@ async function smoke(url) {
         start && getComputedStyle(start).display === 'none';
     });
     if (!started) throw new Error('Start button did not enter gameplay');
+    // Allow two actual animation frames to surface errors in the game's render loop.
+    await page.evaluate(() => new Promise(resolve =>
+      requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    assertBrowserHealthy(errors);
     console.log('PASS Browser smoke: hero loaded, preview displayed, start enabled, game running: ' + url);
   } catch (error) {
-    throw new Error('Browser smoke failed: ' + error.message);
+    throw new Error('Browser smoke failed: ' + error.message +
+      (errors.length ? ' | Browser events: ' + errors.slice(0, 12).join('; ') : ''));
   } finally {
     await browser.close();
   }
