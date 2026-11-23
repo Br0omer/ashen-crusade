@@ -16,9 +16,7 @@ test('protected game builds, infrastructure, and environment paths block publica
     'arch062/js/gameplay.js', 'art01/index.html', 'arch03/index.html', 'v103/index.html',
     'releases/1.0.3-arch03/index.html', 'docs/releases.md', '.env', 'sub/.env.local',
     'game.js', 'style.css', 'play-v051.html', 'ashen-crusade-art02-walk.html', 'build.json',
-    'js/gameplay.js', 'assets/hero-approved.webp', 'arch01/index.html', 'v101/index.html',
-    'art02/index.html', 'art02-fix1/index.html', 'art02-frames/index.html',
-    'art02-gait-study/gait.js', 'art02-armor-study/index.html'];
+    'js/gameplay.js', 'assets/hero-approved.webp', 'arch01/index.html', 'v101/index.html'];
   for (const path of protectedPaths) assert.throws(() => checkChangedFiles(['tests/new.cjs', path]), /защищённые пути/, path);
   assert.throws(() => checkChangedFiles(['tests/\nstrange.cjs']), /защищённые пути/);
   assert.deepEqual(checkChangedFiles(['tests/arch062-swap-fire.cjs', 'tests/arch062-contract.cjs']),
@@ -108,6 +106,9 @@ test('Pipeline V2 allows only exact Git commands from Architect', () => {
   assert.ok(!architect.some((x) => x.action === 'shell' && x.resource.includes('*') && x.resource !== '*'),
     'No shell pattern may contain a wildcard that could admit chained commands');
 
+  for (const path of ['art02/index.html', 'art02-fix1/index.html', 'art02-frames/index.html',
+    'art02-gait-study/gait.js', 'art02-armor-study/index.html'])
+    assert.throws(() => checkChangedFiles([path]), /защищённые пути/, path);
   const child = rules('git-operator');
   assert.deepEqual(child, [
     { action: '*', resource: '*', effect: 'deny' },
