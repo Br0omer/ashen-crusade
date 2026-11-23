@@ -64,12 +64,14 @@ export function tabletPreviewSection(paths, sha, hasIndex = (path) => existsSync
 export function replaceTabletPreview(body, section) {
   const start = '<!-- ashen-tablet-preview:start -->';
   const end = '<!-- ashen-tablet-preview:end -->';
-  if (!section) return body;
-  if (!body.includes(start) && !body.includes(end)) return body.trimEnd() + '\n\n' + section;
+  if (!body.includes(start) && !body.includes(end))
+    return section ? body.trimEnd() + '\n\n' + section : body;
   if (body.split(start).length !== 2 || body.split(end).length !== 2 ||
       body.indexOf(end) < body.indexOf(start))
     throw new Error('Повреждён раздел предпросмотра PR; автоматическое обновление остановлено.');
-  return body.slice(0, body.indexOf(start)) + section + body.slice(body.indexOf(end) + end.length);
+  const updated = body.slice(0, body.indexOf(start)) +
+    (section || '') + body.slice(body.indexOf(end) + end.length);
+  return section ? updated : updated.replace(/\n{3,}/g, '\n\n').trimEnd();
 }
 
 export function checkWorkingTree(porcelain) {
@@ -185,10 +187,8 @@ function publish() {
   let result;
   const previous = existing.status === 0 ? JSON.parse(existing.stdout) : null;
   if (isOpenPullRequest(previous)) {
-    if (tablet) {
-      const updated = replaceTabletPreview(previous.body || '', tablet);
-      if (updated !== previous.body) run('gh', ['pr', 'edit', name, '--repo', REPO, '--body', updated]);
-    }
+    const updated = replaceTabletPreview(previous.body || '', tablet);
+    if (updated !== previous.body) run('gh', ['pr', 'edit', name, '--repo', REPO, '--body', updated]);
     result = previous;
   } else {
     const url = run('gh', ['pr', 'create', '--repo', REPO, '--base', 'main', '--head', name,
