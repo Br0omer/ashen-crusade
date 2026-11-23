@@ -136,5 +136,9 @@ test('game PR body gets SHA-pinned preview, stale links are replaced, and other 
   const body = replaceTabletPreview('Existing PR details', one);
   assert.equal(replaceTabletPreview(body, tabletPreviewSection(paths, next, hasIndex)).includes(sha), false);
   assert.equal(replaceTabletPreview(body, one), body);
+  const removed = replaceTabletPreview(body, '');
+  assert.equal(removed.includes('raw.githack.com'), false);
+  assert.equal(removed.includes('ashen-tablet-preview'), false);
+  assert.match(removed, /Existing PR details/);
   assert.throws(() => replaceTabletPreview('broken <!-- ashen-tablet-preview:start -->', one));
 });
