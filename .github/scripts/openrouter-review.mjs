@@ -1,4 +1,4 @@
-import { blockedReview, buildReviewMessages, ciCommitMatchesHead, describeOpenRouterFailure, isReviewableSourcePath, MODEL_GENERATION_SETTINGS, parseReview, prepareChanges, renderComment, ReviewBlocked } from './review-core.mjs';
+import { blockedReview, buildReviewMessages, ciCommitMatchesHead, describeOpenRouterFailure, isReviewableSourcePath, MODEL_GENERATION_SETTINGS, parseReview, prepareReviewChunks, combineReviewChunks, renderComment, ReviewBlocked } from './review-core.mjs';
 
 const repo = process.env.GITHUB_REPOSITORY;
 const token = process.env.GITHUB_TOKEN;
@@ -121,7 +121,7 @@ async function sourceContext(files, pr) {
   for (const file of candidates.slice(0, 7)) {
     try {
       const body = await readChangedTextFile(file.filename, pr.head.sha);
-      if (!body || total + body.length > 32000) continue;
+      if (!body || total + body.length > 14000) continue;
       sources.push(`FILE: ${file.filename}\n${body}`);
       total += body.length;
     } catch (error) {
@@ -131,13 +131,17 @@ async function sourceContext(files, pr) {
   return sources.join('\n\n');
 }
 
-async function requestReview(pr, files, diff, context) {
+async function requestReview(pr, files, diff, context, part, totalParts) {
   const [agents, roadmap, releases] = await Promise.all([
     readFile('AGENTS.md', 'utf8'),
     readFile('docs/roadmap.md', 'utf8'),
     readFile('docs/releases.md', 'utf8'),
   ]);
   const messages = buildReviewMessages({ pr, files, diff, sources: context, agents, roadmap, releases });
+  // The model sees only its bounded window; aggregation runs only after all windows return.
+  const payload = JSON.parse(messages[1].content);
+  payload.reviewWindow = { index: part, total: totalParts, scope: 'Review ALL included diff lines, do not assume other windows passed.' };
+  messages[1].content = JSON.stringify(payload);
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -220,11 +224,31 @@ if (ci.conclusion !== 'success') {
 } else {
   try {
     const files = await getAllChangedFiles(pr.number);
-    const diff = prepareChanges(files);
+    const windows = prepareReviewChunks(files);
     const context = await sourceContext(files, pr);
-    review = await requestReview(pr, files, diff, context);
+    const results = [];
+    for (let i = 0; i < windows.length; i++) {
+      try {
+        results.push(await requestReview(pr, windows[i].files, windows[i].diff, context, i + 1, windows.length));
+      } catch (error) {
+        // Fail closed: one rejected/unfinished review cannot turn the full PR green.
+        results.push(blockedReview('Окно ' + (i + 1) + '/' + windows.length + ': ' +
+          (error instanceof ReviewBlocked ? error.message : 'незавершённое ревью')));
+        break;
+      }
+      if (results.at(-1).verdict === 'BLOCKED') break;
+    }
+    review = combineReviewChunks(results);
+    if (results.length !== windows.length && review.verdict !== 'BLOCKED')
+      review = blockedReview('Не все окна diff проверены.');
   } catch (error) {
     review = blockedReview(error instanceof ReviewBlocked ? error.message : `Ревью не выполнено: ${error.message}`);
   }
+}
+// A new push during a multi-window review must not produce an approval for an older head.
+const latestPr = await github(`${prefix}/pulls/${pr.number}`);
+if (latestPr.head.sha !== pr.head.sha) {
+  console.log('PR head изменился во время независимого ревью; старый SHA не публикуем.');
+  process.exit(0);
 }
 await publish(pr, review, ci);
