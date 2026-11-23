@@ -276,7 +276,7 @@ test('bounded review window sees entire PR inventory and full approved spec sepa
   assert.deepEqual(payload.reviewWindow.currentWindowFiles, [all[1]]);
   assert.match(payload.approvedIncrementSpec, /FULL APPROVED SPEC/);
   assert.match(system.content, /Не путай отсутствие файла в текущем окне diff с его отсутствием в PR/);
-  assert.match(system.content, /Другие части также будут проверены|других окнах/);
+  assert.match(system.content, /его другие части также будут проверены|в остальных окнах/);
   assert.doesNotMatch(system.content, /всегда выдавай PASS/i);
 });
 
