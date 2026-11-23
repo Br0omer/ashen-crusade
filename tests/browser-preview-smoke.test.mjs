@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { changedPrototypePages, previewUrl, assertBrowserHealthy } from './browser-preview-smoke.mjs';
+import { changedPrototypePages, previewUrl, assertBrowserHealthy, isRetryableHtmlStatus } from './browser-preview-smoke.mjs';
 
 test('only changed prototypes with index pages are smoke-tested', () => {
   const names = changedPrototypePages([
@@ -24,4 +24,11 @@ test('runtime exceptions and failed asset requests prevent browser smoke PASS', 
   assert.doesNotThrow(() => assertBrowserHealthy([]));
   assert.throws(() => assertBrowserHealthy(['Uncaught Error: render failed']), /render failed/);
   assert.throws(() => assertBrowserHealthy(['request failed: hero-approved.webp ERR_CORS']), /ERR_CORS/);
+});
+
+test('only transient first HTML response statuses are retryable', () => {
+  for (const status of [404, 429, 500, 502, 503, 504])
+    assert.equal(isRetryableHtmlStatus(status), true);
+  for (const status of [200, 301, 302, 400, 401, 403, 418])
+    assert.equal(isRetryableHtmlStatus(status), false);
 });
