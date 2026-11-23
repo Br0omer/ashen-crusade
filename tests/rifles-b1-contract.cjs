@@ -41,44 +41,117 @@ function pageScripts(){
 function assertInside(file){assert.ok(file.startsWith(REPO+path.sep),'path escapes the repository: '+file);return file;}
 
 const ARCH_SCRIPTS=['core.js','input.js','projection.js','composite-definition.js','composite-visual.js','state.js','gameplay.js','character-bridge.js'];
-/* kind 'arch062': the accepted build (reference). kind 'rifles': exactly the scripts listed in the prototype page. */
-async function createGame({kind,aim={x:1,y:0},seed=20261123}){
+/* ---------- real asset facts and the origin / canvas-taint model ----------
+ * Dimensions come from the BYTES of the repository assets, not from the definition under test, so a
+ * definition/asset mismatch makes load() reject exactly as in a browser.
+ * Origins: the final origins below were measured by the Architect on the real preview (HTTPS GET):
+ * page on raw.githack.com; hero-approved.webp redirects to raw.githubusercontent.com (ACAO *);
+ * the SVG stays on raw.githack.com (ACAO *). That is a recorded observation, not something this
+ * test can fetch. A real browser was NOT used (see docs/increments). */
+const PREVIEW_SHA='8d5278c62b3de6bb2dd50bb8ac5b4ad3b684c63e';
+const GITHACK={page:`https://raw.githack.com/Br0omer/ashen-crusade/${PREVIEW_SHA}/prototypes/rifles-b1/index.html`,
+  root:`/Br0omer/ashen-crusade/${PREVIEW_SHA}/`,redirects:{'.webp':'https://raw.githubusercontent.com'},
+  acao:{'https://raw.githubusercontent.com':'*','https://raw.githack.com':'*'}};
+const SCENARIOS={
+  githack:GITHACK,
+  githackNoCors:{...GITHACK,acao:{}},
+  pages:{page:'https://br0omer.github.io/ashen-crusade/prototypes/rifles-b1/index.html',root:'/ashen-crusade/',redirects:{},acao:{}},
+  arch062:{page:'https://br0omer.github.io/ashen-crusade/arch062/index.html',root:'/ashen-crusade/',redirects:{},acao:{}}
+};
+function webpSize(buf){
+  assert.equal(buf.toString('latin1',0,4),'RIFF');assert.equal(buf.toString('latin1',8,12),'WEBP');
+  const kind=buf.toString('latin1',12,16);
+  if(kind==='VP8X')return {w:1+buf.readUIntLE(24,3),h:1+buf.readUIntLE(27,3)};
+  if(kind==='VP8 ')return {w:buf.readUInt16LE(26)&0x3fff,h:buf.readUInt16LE(28)&0x3fff};
+  if(kind==='VP8L'){const b=buf.readUInt32LE(21);return {w:(b&0x3fff)+1,h:((b>>14)&0x3fff)+1};}
+  throw new Error('unknown WebP chunk '+kind);
+}
+function svgSize(text){
+  const tag=text.match(/<svg\b[^>]*>/);assert.ok(tag,'svg root element');
+  const attr=name=>{const m=tag[0].match(new RegExp('\\s'+name+'="(\\d+(?:\\.\\d+)?)(?:px)?"'));assert.ok(m,'svg root lacks '+name);return Number(m[1]);};
+  return {w:attr('width'),h:attr('height')};
+}
+function assetBytes(file){
+  const data=fs.readFileSync(file);
+  return file.endsWith('.webp')?{...webpSize(data),bytes:data.length}:{...svgSize(data.toString('utf8')),bytes:data.length};
+}
+function securityError(what){const e=new Error(`Failed to execute '${what}': The canvas has been tainted by cross-origin data.`);e.name='SecurityError';return e;}
+/* A canvas that is origin-clean until a non-CORS cross-origin image (or a tainted canvas) is drawn on it. */
+function modelCanvas(stub,paints,calls){
+  const canvas=stub();let ctx=null;canvas.tainted=false;
+  canvas.getContext=()=>ctx||(ctx=new Proxy(recordingContext(paints,calls),{
+    get(target,key){
+      if(key==='drawImage')return source=>{if(source&&source.tainted)canvas.tainted=true;};
+      if(key==='getImageData')return (...a)=>{if(canvas.tainted)throw securityError('getImageData');return target.getImageData(...a);};
+      return target[key];
+    },
+    set(target,key,value){target[key]=value;return true;}
+  }));
+  canvas.toDataURL=()=>{if(canvas.tainted)throw securityError('toDataURL');return 'data:image/png;base64,AAAA';};
+  return canvas;
+}
+/* kind 'arch062': the accepted build (reference). kind 'rifles': exactly the scripts listed in the prototype page.
+ * scenario: where the page is served from. bridgeTransform lets a negative case reproduce the old bridge.
+ * expectLoadFailure: do not require ready (the failure itself is what is checked). */
+async function createGame({kind,aim={x:1,y:0},seed=20261123,scenario=kind==='rifles'?'githack':'arch062',bridgeTransform=null,expectLoadFailure=false}){
   const gamepad={axes:[0,0,aim.x,aim.y],buttons:Array.from({length:10},()=>({pressed:false}))};
-  const elements=new Map(),imageSrcs=[],paints=[],calls=[];
+  const elements=new Map(),imageSrcs=[],paints=[],calls=[],imageRequests=[],canvases=[];
+  const env=SCENARIOS[scenario];assert.ok(env,'unknown scenario '+scenario);
   const getElementById=id=>{if(!elements.has(id))elements.set(id,stubElement());return elements.get(id);};
   function stubElement(){
     return {style:{},textContent:'',disabled:false,onclick:null,src:'',width:0,height:0,dataset:{},
       addEventListener(){},getContext:()=>recordingContext(paints,calls),toDataURL:()=>'data:image/png;base64,'};
   }
-  const defName=kind==='rifles'?'RIFLES_HERO_DEFINITION':'COMPOSITE_HERO_DEFINITION';
-  let context;
   class FakeImage{
     set src(value){
       this._src=value;imageSrcs.push(value);
+      const crossOriginAtSrc=this.crossOrigin===undefined?null:this.crossOrigin; // value when the request starts
       Promise.resolve().then(()=>{
-        const d=vm.runInContext(defName,context);let w=256,h=64;
-        if(value===d.source){w=d.width;h=d.height;}
-        else if(d.weapons.some(x=>x.addon===value)){w=d.canvasWidth;h=d.height;}
-        this.naturalWidth=w;this.naturalHeight=h;this.complete=true;this.onload&&this.onload();
+        const pageUrl=new URL(env.page),url=new URL(value,pageUrl);
+        assert.ok(url.pathname.startsWith(env.root),'image outside the site root: '+value);
+        const file=assertInside(path.join(REPO,decodeURIComponent(url.pathname.slice(env.root.length))));
+        const ext=path.extname(url.pathname),finalOrigin=env.redirects[ext]||url.origin;
+        const crossOrigin=finalOrigin!==pageUrl.origin;
+        const request={src:value,file:path.relative(REPO,file),finalOrigin,crossOrigin,crossOriginAtSrc,ok:false};
+        imageRequests.push(request);
+        if(!fs.existsSync(file)){this.onerror&&this.onerror(new Error('404'));return;}
+        // CORS-enabled request to another origin needs Access-Control-Allow-Origin, otherwise the image fails
+        if(crossOrigin&&crossOriginAtSrc==='anonymous'&&env.acao[finalOrigin]!=='*'){this.onerror&&this.onerror(new Error('CORS'));return;}
+        const size=assetBytes(file);
+        this.naturalWidth=size.w;this.naturalHeight=size.h;this.complete=true;
+        // a cross-origin image fetched without CORS draws fine but makes the canvas non-origin-clean
+        this.tainted=crossOrigin&&crossOriginAtSrc!=='anonymous';
+        request.ok=true;request.tainted=this.tainted;
+        this.onload&&this.onload();
       });
     }
     get src(){return this._src;}
   }
   const sandbox={console,Image:FakeImage,innerWidth:1280,innerHeight:800,devicePixelRatio:1,performance:{now:()=>0},
     addEventListener(){},requestAnimationFrame(){},navigator:{getGamepads:()=>[gamepad]},
-    document:{getElementById,querySelector:()=>stubElement(),createElement:()=>stubElement()}};
-  context=vm.createContext(sandbox);
+    document:{getElementById,querySelector:()=>stubElement(),
+      createElement:tag=>{if(tag!=='canvas')return stubElement();const c=modelCanvas(stubElement,paints,calls);canvases.push(c);return c;}}};
+  const context=vm.createContext(sandbox);
   vm.runInContext(`(()=>{let a=${seed|0};Math.random=function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}})()`,context);
   const files=kind==='rifles'
     ?pageScripts().map(src=>assertInside(path.resolve(PROTO,src)))
     :ARCH_SCRIPTS.map(f=>path.join(A062,'js',f));
-  for(const file of files)vm.runInContext(read(file),context,{filename:path.relative(REPO,file)});
+  for(const file of files){
+    let source=read(file);
+    if(bridgeTransform&&file.endsWith('character-bridge.js'))source=bridgeTransform(source);
+    vm.runInContext(source,context,{filename:path.relative(REPO,file)});
+  }
   const ev=code=>vm.runInContext(code,context);
-  await ev('characterVisual.load()');
-  await Promise.resolve();
-  assert.equal(ev('characterVisual.getStatus()'),'ready',kind+': graphics must be ready');
+  let loadError=null;
+  try{await ev('characterVisual.load()');}catch(error){loadError=error;}
+  for(let i=0;i<5;i++)await Promise.resolve();
+  if(expectLoadFailure)assert.ok(loadError,'load() must reject in this scenario');
+  else{
+    assert.equal(loadError,null,kind+': load() rejected: '+(loadError&&loadError.message));
+    assert.equal(ev('characterVisual.getStatus()'),'ready',kind+': graphics must be ready');
+  }
   ev('spawn=1e9');
-  const g={context,ev,gamepad,elements,imageSrcs,paints,calls,files,
+  const g={context,ev,gamepad,elements,imageSrcs,imageRequests,canvases,loadError,paints,calls,files,
     json:code=>JSON.parse(ev(`JSON.stringify(${code})`)),
     set(button,value){gamepad.buttons[button].pressed=value;},
     update(dt=DT){ev(`update(${dt})`);},
@@ -590,6 +663,75 @@ async function pageResources(){
   return 'page resources';
 }
 
+/* ---------- hero load chain: real bytes -> Image.src/origin -> canvas readback -> preview -> start button ----------
+ * The earlier contract used an Image stub that returned the definition's own sizes and never modelled
+ * origins, so it passed while a real browser rejected load() (SecurityError on getImageData after the
+ * .webp had been redirected to another origin without CORS). Here sizes come from file bytes and the
+ * canvas becomes unreadable when a cross-origin image was requested without crossOrigin. */
+async function heroLoadChain(){
+  const g=await createGame({kind:'rifles'}),def=g.json('RIFLES_HERO_DEFINITION');
+  // 1. real asset bytes against the definition (not against the stub's own numbers)
+  const webp=assetBytes(path.join(A062,'assets/hero-approved.webp')),addon=assetBytes(path.join(A062,'assets/rifle-long-addon.svg'));
+  assert.deepEqual([webp.w,webp.h],[208,256],'hero-approved.webp pixel size from its RIFF/VP8X header');
+  assert.deepEqual([webp.w,webp.h],[def.width,def.height],'webp vs base.width/height');
+  assert.deepEqual([addon.w,addon.h],[240,256],'rifle-long-addon.svg width/height attributes');
+  assert.deepEqual([addon.w,addon.h],[def.canvasWidth,def.height],'svg vs canvasWidth/height');
+  assert.ok(webp.bytes>1000&&addon.bytes>200);
+  // 2. requests as the preview host serves them: the .webp ends up on another origin than the page
+  const req=Object.fromEntries(g.imageRequests.map(r=>[path.basename(r.file),r]));
+  assert.equal(req['hero-approved.webp'].finalOrigin,'https://raw.githubusercontent.com');
+  assert.equal(req['hero-approved.webp'].crossOrigin,true,'the preview hero image is cross-origin');
+  assert.equal(req['rifle-long-addon.svg'].finalOrigin,'https://raw.githack.com');
+  assert.equal(req['rifle-long-addon.svg'].crossOrigin,false);
+  for(const name of ['hero-approved.webp','rifle-long-addon.svg']){
+    assert.equal(req[name].crossOriginAtSrc,'anonymous',name+': crossOrigin must be set BEFORE src is assigned');
+    assert.equal(req[name].ok,true);assert.equal(req[name].tainted,false,name+' must be CORS-clean');
+  }
+  // 3. readback and previews succeeded: every canvas origin-clean, preview filled, then the start button
+  assert.ok(g.canvases.length>=9,'native + 4 parts + 2 weapons + 2 composites');
+  assert.ok(g.canvases.every(c=>!c.tainted),'no canvas may be tainted');
+  assert.equal(g.ev('characterVisual.getStatus()'),'ready');
+  assert.match(g.elements.get('hero-preview').src,/^data:image\/png/,'hero preview filled');
+  assert.match(g.elements.get('asset-status').textContent,/Составной герой загружен/);
+  assert.equal(g.elements.get('play').disabled,false,'start enabled after a real-origin load');
+  assert.equal(g.elements.get('swap-weapon').disabled,false);
+  g.elements.get('play').onclick();
+  assert.equal(g.elements.get('start').style.display,'none');assert.equal(g.ev('running'),true);
+  // 4. same-origin hosting (GitHub Pages / local server) still works with the same bridge
+  const pages=await createGame({kind:'rifles',scenario:'pages'});
+  assert.ok(pages.imageRequests.every(r=>!r.crossOrigin&&r.ok),'everything same-origin');
+  assert.ok(pages.canvases.every(c=>!c.tainted));assert.equal(pages.elements.get('play').disabled,false);
+  // 5. NEGATIVE: the previous bridge (default Image factory, no crossOrigin) fails exactly as on the tablet
+  const oldBridge=src=>{const out=src.replace(', RIFLES_IMAGE_FACTORY);',');');assert.notEqual(out,src,'transform must apply');return out;};
+  const old=await createGame({kind:'rifles',bridgeTransform:oldBridge,expectLoadFailure:true});
+  const oldReq=old.imageRequests.find(r=>r.file.endsWith('hero-approved.webp'));
+  assert.equal(oldReq.crossOriginAtSrc,null);assert.equal(oldReq.tainted,true,'cross-origin without CORS taints');
+  assert.equal(old.loadError.name,'SecurityError');
+  assert.equal(old.elements.get('play').disabled,true,'start stays blocked');
+  assert.match(old.elements.get('asset-status').textContent,/Не удалось загрузить героя \(этап: load; SecurityError:/,'stage and error are shown');
+  assert.equal(old.ev("document.getElementById('hero-preview').src"),'','no preview after a failed load');assert.equal(old.ev('running'),false);
+  //    the old bridge is fine on same-origin hosting: the origin model, not the stub sizes, is what exposes it
+  const oldSame=await createGame({kind:'rifles',scenario:'pages',bridgeTransform:oldBridge});
+  assert.equal(oldSame.elements.get('play').disabled,false);
+  // 6. NEGATIVE: crossOrigin assigned after src (wrong order) does not help
+  const late=await createGame({kind:'rifles',expectLoadFailure:true,bridgeTransform:src=>{
+    const out=src.replace("image.crossOrigin='anonymous';return image;","Promise.resolve().then(()=>{image.crossOrigin='anonymous'});return image;");
+    assert.notEqual(out,src,'transform must apply');return out;}});
+  assert.equal(late.imageRequests.find(r=>r.file.endsWith('hero-approved.webp')).crossOriginAtSrc,null);
+  assert.equal(late.loadError.name,'SecurityError');assert.equal(late.elements.get('play').disabled,true);
+  // 7. NEGATIVE: a host that does not send Access-Control-Allow-Origin rejects the CORS request: stage load, start blocked
+  const noCors=await createGame({kind:'rifles',scenario:'githackNoCors',expectLoadFailure:true});
+  assert.match(noCors.loadError.message,/Asset failed to load: .*hero-approved\.webp/);
+  assert.equal(noCors.elements.get('play').disabled,true);
+  assert.match(noCors.elements.get('asset-status').textContent,/этап: load; Error: Asset failed to load/);
+  // 8. a size mismatch (definition vs file bytes) is a load failure with its own message
+  const wrongSize=await createGame({kind:'rifles',expectLoadFailure:true,bridgeTransform:src=>src.replace('const RIFLES_HERO_DEFINITION=(base=>Object.freeze({\n  ...base,','const RIFLES_HERO_DEFINITION=(base=>Object.freeze({\n  ...base,width:base.width+1,')});
+  assert.match(wrongSize.loadError.message,/Unexpected dimensions: .*hero-approved\.webp/);assert.equal(wrongSize.elements.get('play').disabled,true);
+  // 9. diagnostics: the later stage is labelled too
+  assert.match(g.ev("describeCharacterFailure('preview',Object.assign(new Error('x'),{name:'SecurityError'}))"),/этап: preview; SecurityError: x/);
+  return 'hero load chain';
+}
+
 function permutations(list){
   if(list.length<=1)return [list];
   return list.flatMap((item,i)=>permutations([...list.slice(0,i),...list.slice(i+1)]).map(rest=>[item,...rest]));
@@ -597,7 +739,7 @@ function permutations(list){
 
 async function run(){
   const steps=[staticChecks,fidelityChecks,profileAndGeometry,parity,levels,reverseOrder,tunnelling,entryOrder,ties,uniqueness,rangeLimit,twoShots,
-    swapFire,cooldownsAndHold,pauseBlocks,swapInFlight,flashAndColours,trailGeometry,restart,pageResources];
+    swapFire,cooldownsAndHold,pauseBlocks,swapInFlight,flashAndColours,trailGeometry,restart,pageResources,heroLoadChain];
   const done=[];
   for(const step of steps)done.push(await step());
   console.log('PASS: RIFLES-B1 contract: '+done.join(', ')+'.');

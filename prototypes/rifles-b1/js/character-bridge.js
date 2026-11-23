@@ -7,7 +7,15 @@ const RIFLES_HERO_DEFINITION=(base=>Object.freeze({
   source:arch062Asset(base.source),
   weapons:Object.freeze(base.weapons.map(w=>Object.freeze(w.addon?{...w,addon:arch062Asset(w.addon)}:{...w})))
 }))(COMPOSITE_HERO_DEFINITION);
-let characterVisual = new CompositeCharacterViews.LayeredSpriteVisual(RIFLES_HERO_DEFINITION, WorldProjection, (w,h) => {const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;return canvas;});
+/* The visual copies the source bitmap into a canvas and reads its pixels back (getImageData), and
+ * the previews use toDataURL. Both throw SecurityError if any drawn image is not origin-clean.
+ * A page served by a preview host (raw.githack.com) is redirected for the .webp to another origin
+ * (raw.githubusercontent.com); without CORS that image taints the canvas. The shared arch062 visual
+ * creates `new Image()` without crossOrigin, so the composition root injects its own factory:
+ * crossOrigin MUST be set BEFORE `src` is assigned (the visual assigns src after calling the factory).
+ * On a same-origin host (GitHub Pages, local server) 'anonymous' is harmless. */
+const RIFLES_IMAGE_FACTORY = () => {const image=new Image();image.crossOrigin='anonymous';return image;};
+let characterVisual = new CompositeCharacterViews.LayeredSpriteVisual(RIFLES_HERO_DEFINITION, WorldProjection, (w,h) => {const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;return canvas;}, RIFLES_IMAGE_FACTORY);
 function prepareCharacterPose() {
   const moving = Math.hypot(p.vx || 0, p.vy || 0) > .001;
   // Muzzle flash and the shooting action follow their own timer (MUZZLE_FLASH_TIME), not the
@@ -24,7 +32,15 @@ const characterStart = document.getElementById('play');
 const characterStatus = document.getElementById('asset-status');
 characterStart.disabled = true;
 prepareCharacterPose();
+// Failure stage is shown to the player/tester: 'load' = images, sizes, pixel readback;
+// 'preview' = the DOM previews built after a successful load. Start stays blocked in both cases.
+let characterStage = 'load';
+function describeCharacterFailure(stage, error) {
+  const name = error && error.name || 'Error', message = String(error && error.message || error).slice(0, 160);
+  return 'Не удалось загрузить героя (этап: '+stage+'; '+name+': '+message+'). Начало игры заблокировано; обновите страницу.';
+}
 characterVisual.load().then(() => {
+  characterStage = 'preview';
   prepareCharacterPose();
   refreshEquipmentView();
   document.getElementById('swap-weapon').disabled=false;
@@ -33,7 +49,7 @@ characterVisual.load().then(() => {
   characterStart.disabled = false;
 }).catch(error => {
   characterStart.disabled = true;
-  characterStatus.textContent = 'Не удалось загрузить героя. Начало игры заблокировано; обновите страницу.';
+  characterStatus.textContent = describeCharacterFailure(characterStage, error);
   console.error(error);
 });
 
