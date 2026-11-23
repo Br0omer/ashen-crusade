@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { blockedReview, buildReviewMessages, ciCommitMatchesHead, describeOpenRouterFailure, isOpenCodeConfigPath, isReviewableSourcePath, MODEL_GENERATION_SETTINGS, OPENCODE_V2_REFERENCE, parseReview, prepareChanges, prepareReviewChunks, combineReviewChunks, renderComment, ReviewBlocked, touchesOpenCodeConfig } from '../.github/scripts/review-core.mjs';
+import { blockedReview, buildReviewMessages, ciCommitMatchesHead, contractJobsPassed, describeOpenRouterFailure, isOpenCodeConfigPath, isReviewableSourcePath, MODEL_GENERATION_SETTINGS, OPENCODE_V2_REFERENCE, parseReview, prepareChanges, prepareReviewChunks, combineReviewChunks, renderComment, ReviewBlocked, touchesOpenCodeConfig } from '../.github/scripts/review-core.mjs';
 
 const patch = { filename: 'src/player.js', status: 'modified', additions: 2, deletions: 1, patch: '@@ -1 +1 @@\n-old\n+new' };
 
@@ -244,4 +244,16 @@ test('review aggregation preserves blocking findings across every window', () =>
   assert.equal(combineReviewChunks([ok, ok]).verdict, 'PASS');
   assert.equal(combineReviewChunks([ok, high]).findings[0].severity, 'high');
   assert.throws(() => combineReviewChunks([]), ReviewBlocked);
+});
+
+test('review CI gate requires all present jobs to succeed and supports legacy PRs', () => {
+  const core = { name: 'Character visual contracts', status: 'completed', conclusion: 'success' };
+  const smoke = { name: 'Browser preview smoke', status: 'completed', conclusion: 'success' };
+  assert.equal(contractJobsPassed([core, smoke]), true);
+  assert.equal(contractJobsPassed([core]), true); // existing pre-browser PR CI
+  assert.equal(contractJobsPassed([core, { ...smoke, conclusion: 'failure' }]), false);
+  assert.equal(contractJobsPassed([core, { ...smoke, status: 'in_progress', conclusion: null }]), false);
+  assert.equal(contractJobsPassed([{ ...core, conclusion: 'failure' }, smoke]), false);
+  assert.equal(contractJobsPassed([]), false);
+  assert.equal(contractJobsPassed(null), false);
 });
