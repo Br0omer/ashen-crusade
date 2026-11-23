@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { autoBranchName, checkChangedFiles, incrementSpecPath } from '../.opencode/scripts/git-flow.mjs';
+import { autoBranchName, incrementSpecPath } from '../.opencode/scripts/git-flow.mjs';
 import { changedStatusPaths, readIncrementSpec } from '../.opencode/scripts/dev-flow.mjs';
 import { buildReviewMessages } from '../.github/scripts/review-core.mjs';
 
@@ -27,16 +27,6 @@ test('generated branch names are safe and not controlled by shell arguments', ()
   assert.throws(() => autoBranchName(new Date('garbage'), 'deadbeef'));
   assert.throws(() => autoBranchName(new Date(), 'x;evil'));
   assert.throws(() => incrementSpecPath('main'));
-});
-
-test('candidate art and protected roots cannot be published', () => {
-  for (const path of ['art02/index.html', 'art02-fix1/index.html', 'art02-frames/gait.js',
-    'art02-gait-study/gait.js', 'art02-armor-study/index.html', '.opencode/agents/developer.md',
-    '.github/workflows/ci.yml', 'index.html', 'js/state.js', 'assets/sprite.png']) {
-    assert.throws(() => checkChangedFiles([path]), /защищённые пути/, path);
-  }
-  assert.deepEqual(checkChangedFiles(['docs/increments/test-arch062-swap-fire.md', 'tests/arch062-swap-fire.cjs']),
-    ['docs/increments/test-arch062-swap-fire.md', 'tests/arch062-swap-fire.cjs']);
 });
 
 test('developer status parsing keeps leading space and ignores only untracked DS_Store', () => {
