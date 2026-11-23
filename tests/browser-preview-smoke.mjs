@@ -46,17 +46,18 @@ async function smoke(url) {
       return {
         image: !!img && img.complete && img.naturalWidth > 0,
         status: status?.textContent || '',
-        character: typeof characterVisual !== 'undefined' && characterVisual.getStatus() === 'ready',
+        startEnabled: !document.getElementById('play')?.disabled,
       };
     });
-    if (!ready.image || !ready.character) throw new Error('Hero canvas not ready: ' + JSON.stringify(ready));
+    if (!ready.image || !ready.startEnabled) throw new Error('Hero canvas not ready: ' + JSON.stringify(ready));
     await page.click('#play', { timeout: 10000 });
-    const started = await page.evaluate(() => {
-      const start = document.getElementById('start');
-      return typeof running !== 'undefined' && running === true &&
-        start && getComputedStyle(start).display === 'none';
-    });
-    if (!started) throw new Error('Start button did not enter gameplay');
+    // Observe the UI contract, not lexical globals (the game may later use ES modules).
+    await page.waitForFunction(() => {
+      const overlay = document.getElementById('start');
+      const canvas = document.getElementById('c');
+      return overlay && getComputedStyle(overlay).display === 'none' &&
+        canvas && canvas.width > 0 && canvas.height > 0;
+    }, null, { timeout: 10000 });
     // Allow two actual animation frames to surface errors in the game's render loop.
     await page.evaluate(() => new Promise(resolve =>
       requestAnimationFrame(() => requestAnimationFrame(resolve))));
@@ -71,9 +72,10 @@ async function smoke(url) {
 }
 
 async function main() {
-  const sha = process.env.PR_HEAD_SHA;
-  if (!sha) throw new Error('PR_HEAD_SHA is required: never smoke a mutable branch URL');
-  const changes = execFileSync('git', ['diff', '--name-only', 'HEAD^1', 'HEAD^2'], { encoding: 'utf8' })
+  const sha = process.env.PR_HEAD_SHA, base = process.env.PR_BASE_SHA;
+  if (!/^[0-9a-f]{40}$/i.test(sha || '') || !/^[0-9a-f]{40}$/i.test(base || ''))
+    throw new Error('PR_HEAD_SHA and PR_BASE_SHA must be full immutable SHAs');
+  const changes = execFileSync('git', ['diff', '--name-only', base + '...' + sha], { encoding: 'utf8' })
     .split(/\r?\n/).filter(Boolean);
   const pages = changedPrototypePages(changes);
   if (!pages.length) { console.log('SKIP: no changed browser prototype'); return; }
