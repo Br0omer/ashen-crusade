@@ -1,4 +1,4 @@
-import { blockedReview, buildReviewMessages, ciCommitMatchesHead, isReviewableSourcePath, MODEL_GENERATION_SETTINGS, parseReview, prepareChanges, renderComment, ReviewBlocked } from './review-core.mjs';
+import { blockedReview, buildReviewMessages, ciCommitMatchesHead, describeOpenRouterFailure, isReviewableSourcePath, MODEL_GENERATION_SETTINGS, parseReview, prepareChanges, renderComment, ReviewBlocked } from './review-core.mjs';
 
 const repo = process.env.GITHUB_REPOSITORY;
 const token = process.env.GITHUB_TOKEN;
@@ -151,7 +151,10 @@ async function requestReview(pr, files, diff, context) {
     }),
     signal: AbortSignal.timeout(90000),
   });
-  if (!response.ok) throw new ReviewBlocked(`OpenRouter вернул HTTP ${response.status}. Проверьте модель, ключ и баланс.`);
+  if (!response.ok) {
+    const errorBody = await response.text().catch(() => '');
+    throw new ReviewBlocked(describeOpenRouterFailure(response.status, errorBody));
+  }
   const data = await response.json();
   const content = data.choices?.[0]?.message?.content;
   const text = typeof content === 'string' ? content : Array.isArray(content)
