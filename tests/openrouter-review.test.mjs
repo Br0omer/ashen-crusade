@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { blockedReview, buildReviewMessages, ciCommitMatchesHead, contractJobsPassed, describeOpenRouterFailure, isOpenCodeConfigPath, isReviewableSourcePath, MODEL_GENERATION_SETTINGS, OPENCODE_V2_REFERENCE, parseReview, prepareChanges, prepareReviewChunks, combineReviewChunks, renderComment, ReviewBlocked, touchesOpenCodeConfig } from '../.github/scripts/review-core.mjs';
+import { blockedReview, buildReviewMessages, ciCommitMatchesHead, contractJobsPassed, describeOpenRouterFailure, isOpenCodeConfigPath, isReviewableSourcePath, MODEL_GENERATION_SETTINGS, OPENCODE_V2_REFERENCE, parseReview, prepareChanges, prepareReviewChunks, combineReviewChunks, renderComment, ReviewBlocked, touchesOpenCodeConfig, validateApprovedSpec } from '../.github/scripts/review-core.mjs';
 
 const patch = { filename: 'src/player.js', status: 'modified', additions: 2, deletions: 1, patch: '@@ -1 +1 @@\n-old\n+new' };
 
@@ -256,4 +256,43 @@ test('review CI gate requires all present jobs to succeed and supports legacy PR
   assert.equal(contractJobsPassed([{ ...core, conclusion: 'failure' }, smoke]), false);
   assert.equal(contractJobsPassed([]), false);
   assert.equal(contractJobsPassed(null), false);
+});
+
+test('bounded review window sees entire PR inventory and full approved spec separately', () => {
+  const all = ['docs/increments/feature-inc-20261123-6a0e525b.md',
+    'prototypes/rifles-b1/js/gameplay.js', 'tests/rifles-b1-contract.cjs'];
+  const scope = { index: 2, total: 4, allChangedFiles: all.map(path => ({ path, status: 'added' })),
+    currentWindowFiles: ['prototypes/rifles-b1/js/gameplay.js'] };
+  const [system, user] = buildReviewMessages({
+    pr, files: [file('prototypes/rifles-b1/js/gameplay.js')],
+    diff: prepareChanges([file('prototypes/rifles-b1/js/gameplay.js')]),
+    sources: '', agents: 'AGENTS', roadmap: 'ROADMAP', releases: 'RELEASES',
+    scope, approvedSpec: 'FULL APPROVED SPEC — A/B1 collision and cooldown criteria',
+  });
+  const payload = JSON.parse(user.content);
+  assert.equal(payload.reviewWindow.index, 2);
+  assert.equal(payload.reviewWindow.total, 4);
+  assert.deepEqual(payload.reviewWindow.allChangedFiles.map(f => f.path), all);
+  assert.deepEqual(payload.reviewWindow.currentWindowFiles, [all[1]]);
+  assert.match(payload.approvedIncrementSpec, /FULL APPROVED SPEC/);
+  assert.match(system.content, /Не путай отсутствие файла в текущем окне diff с его отсутствием в PR/);
+  assert.match(system.content, /его другие части также будут проверены|в остальных окнах/);
+  assert.doesNotMatch(system.content, /всегда выдавай PASS/i);
+});
+
+test('non-window reviews preserve prior contract without invented inventory', () => {
+  const [, user] = build([file('src/player.js')]);
+  const payload = JSON.parse(user.content);
+  assert.equal(Object.hasOwn(payload, 'reviewWindow'), false);
+  assert.equal(payload.approvedIncrementSpec, '');
+});
+
+test('approved increment spec reports missing, empty, and valid content distinctly', () => {
+  const filename = 'docs/increments/example.md';
+  assert.throws(() => validateApprovedSpec(filename, null), /Не удалось получить целиком/);
+  assert.throws(() => validateApprovedSpec(filename, ''), /ТЗ пусто/);
+  assert.throws(() => validateApprovedSpec(filename, '  \n'), /ТЗ пусто/);
+  assert.equal(validateApprovedSpec(filename, '## Цель\nПроверить\n'),
+    'FILE: ' + filename + '\n## Цель\nПроверить\n');
+  assert.throws(() => validateApprovedSpec('../arch062/index.html', 'test'), /Некорректный путь/);
 });

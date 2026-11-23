@@ -47,6 +47,16 @@ export function ciCommitMatchesHead(runSha, headSha, parents = []) {
   return runSha === headSha || parents.some((parent) => parent.sha === headSha);
 }
 
+export function validateApprovedSpec(filename, body) {
+  if (typeof filename !== 'string' || !/^docs\/increments\/[^/]+\.md$/.test(filename))
+    throw new ReviewBlocked('Некорректный путь согласованного ТЗ.');
+  if (body === null || typeof body !== 'string')
+    throw new ReviewBlocked('Не удалось получить целиком согласованное ТЗ: ' + filename);
+  if (!body.trim())
+    throw new ReviewBlocked('Согласованное ТЗ пусто: ' + filename);
+  return 'FILE: ' + filename + '\n' + body;
+}
+
 export function contractJobsPassed(jobs) {
   if (!Array.isArray(jobs)) return false;
   const core = jobs.find(j => j.name === 'Character visual contracts');
@@ -259,17 +269,26 @@ const REVIEWER_RULES = `Ты независимый ревьюер кода и Q
 При нехватке данных — BLOCKED; при реальных исправимых дефектах — CHANGES_REQUESTED. В manual_checks перечисли точные ручные QA-сценарии. PASS не означает игровой/художественной приёмки или разрешения на merge.
 Верни СТРОГО JSON без Markdown: {"verdict":"PASS|CHANGES_REQUESTED|BLOCKED","summary":"на русском","findings":[{"severity":"high|medium|low","file":"путь","problem":"проблема","fix":"исправление"}],"manual_checks":["ручной сценарий"]}.`;
 
-export function buildReviewMessages({ pr, files, diff, sources, agents, roadmap, releases }) {
+export function buildReviewMessages({ pr, files, diff, sources, agents, roadmap, releases,
+  approvedSpec = '', scope = null }) {
   const includeOpenCode = touchesOpenCodeConfig(files);
-  const system = includeOpenCode
-    ? `${REVIEWER_RULES}\n\n${OPENCODE_V2_REFERENCE}`
-    : REVIEWER_RULES;
+  const scopedRules = scope ? `\n\nРЕЖИМ ЧАСТИЧНОГО ОКНА: пользовательский пакет содержит ТОЛЬКО окно ${scope.index}/${scope.total} полного PR.
+- Список allChangedFiles содержит имена ВСЕХ изменённых файлов PR. Не путай отсутствие файла в текущем окне diff с его отсутствием в PR или в репозитории.
+- Проверяй весь код, реально переданный в diff этого окна, по полному ТЗ approvedIncrementSpec. Если другая зависимость есть в allChangedFiles, но не в currentWindowFiles, она проверяется в другом окне: не ставь BLOCKED и не оформляй замечание "файл отсутствует" только из-за этой границы.
+- Если фрагмент файла помечен PART i/n, его другие части также будут проверены в остальных окнах. Не утверждай, что не переданные в это окно строки отсутствуют в PR.
+- BLOCKED допускается при реально отсутствующих обязательных данных внутри заданного текущего окна, повреждённом patch или недоступном самом ТЗ; при проверяемом дефекте кода — CHANGES_REQUESTED.
+- PASS означает отсутствие доказанных дефектов ТОЛЬКО в текущем окне; итоговый PASS сформирует агрегатор после проверки всех окон. Не объявляй весь PR проверенным в одном окне.` : '';
+  const system = REVIEWER_RULES + scopedRules +
+    (includeOpenCode ? `\n\n${OPENCODE_V2_REFERENCE}` : '');
   const user = JSON.stringify({
     pr: { number: pr.number, title: pr.title, description: (pr.body || '').slice(0, 8500), base: pr.base.ref, head: pr.head.sha },
     trustedBaseRules: String(agents).slice(0, 8000),
     roadmap: String(roadmap).slice(-8200),
     releases: String(releases).slice(0, 4000),
     diff,
+    ...(scope ? { reviewWindow: { index: scope.index, total: scope.total,
+      allChangedFiles: scope.allChangedFiles, currentWindowFiles: scope.currentWindowFiles } } : {}),
+    approvedIncrementSpec: approvedSpec,
     changedSourceFiles: sources,
     ci: 'Contract tests: success (после завершения GitHub Actions)',
   });
