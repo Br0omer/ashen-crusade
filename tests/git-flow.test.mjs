@@ -86,15 +86,19 @@ test('Git approval rules are narrow and ask only in primary Architect', () => {
       }));
   };
   const architect = rules('architect');
-  const primaryShell = architect.filter((x) => x.action === 'shell');
-  assert.deepEqual(primaryShell, [
+  // Assert the entire ordered permission list. Later rules can override denies.
+  assert.deepEqual(architect, [
+    { action: 'edit', resource: '*', effect: 'deny' },
     { action: 'shell', resource: '*', effect: 'deny' },
     { action: 'shell', resource: 'node .opencode/scripts/git-flow.mjs status', effect: 'ask' },
-    { action: 'shell', resource: 'node .opencode/scripts/git-flow.mjs start *', effect: 'ask' },
+    { action: 'shell', resource: 'node .opencode/scripts/git-flow.mjs start test/arch062-swap-fire', effect: 'ask' },
     { action: 'shell', resource: 'node .opencode/scripts/git-flow.mjs publish', effect: 'ask' },
+    { action: 'subagent', resource: '*', effect: 'deny' },
+    { action: 'subagent', resource: 'developer', effect: 'ask' },
+    { action: 'subagent', resource: 'git-operator', effect: 'ask' },
   ]);
-  assert.ok(architect.some((x) => x.action === 'edit' && x.resource === '*' && x.effect === 'deny'));
-  assert.ok(architect.some((x) => x.action === 'subagent' && x.resource === '*' && x.effect === 'deny'));
+  assert.ok(!architect.some((x) => x.action === 'shell' && x.resource.includes('*') && x.resource !== '*'),
+    'No shell pattern may contain a wildcard that could admit chained commands');
 
   const child = rules('git-operator');
   assert.deepEqual(child, [
