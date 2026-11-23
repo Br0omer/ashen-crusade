@@ -24,17 +24,45 @@ export function assertBrowserHealthy(errors) {
   if (errors.length) throw new Error('Page/network errors: ' + errors.slice(0, 12).join('; '));
 }
 
+export function isRetryableHtmlStatus(status) {
+  return status === 404 || status === 429 || status === 500 ||
+    status === 502 || status === 503 || status === 504;
+}
+
+async function openPreviewHtml(page, url, errors) {
+  // Only transient first-document/CDN errors can be retried. Do not retry
+  // JS exceptions, CORS, failed images, or a successful HTML that cannot boot.
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    let status = null, networkError = null;
+    try {
+      const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
+      status = response?.status() ?? null;
+    } catch (error) {
+      if (!/timeout|net::ERR_|navigation failed/i.test(error.message)) throw error;
+      networkError = error;
+    }
+    if (status === 200) return;
+    if (!networkError && !isRetryableHtmlStatus(status))
+      throw new Error('HTML status ' + status);
+    if (attempt === 3)
+      throw new Error('HTML unavailable after 3 attempts: ' +
+        (networkError?.message || ('status ' + status)));
+    // Prior navigation errors are not errors in the successfully loaded game.
+    errors.length = 0;
+    await new Promise(resolve => setTimeout(resolve, 3500));
+  }
+}
+
 async function smoke(url) {
   const { chromium } = await import('playwright');
   const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
+  const errors = [];
   try {
     const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
-    const errors = [];
     page.on('pageerror', err => errors.push(err.message.slice(0, 400)));
     page.on('requestfailed', request => errors.push(
       'request failed: ' + request.url().slice(0, 150) + ' ' + (request.failure()?.errorText || '')));
-    const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
-    if (response?.status() !== 200) throw new Error('HTML status ' + response?.status());
+    await openPreviewHtml(page, url, errors);
     await page.waitForFunction(() => {
       const status = document.getElementById('asset-status');
       const button = document.getElementById('play');
