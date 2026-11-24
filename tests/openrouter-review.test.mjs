@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { blockedReview, buildReviewMessages, ciCommitMatchesHead, contractJobsPassed, describeOpenRouterFailure, isOpenCodeConfigPath, isReviewableSourcePath, MODEL_GENERATION_SETTINGS, OPENCODE_V2_REFERENCE, parseReview, prepareChanges, prepareReviewChunks, combineReviewChunks, renderComment, ReviewBlocked, touchesOpenCodeConfig, validateApprovedSpec } from '../.github/scripts/review-core.mjs';
+import { blockedReview, buildReviewMessages, ciCommitMatchesHead, contractJobsPassed, describeOpenRouterFailure, isOpenCodeConfigPath, isReviewableSourcePath, MODEL_GENERATION_SETTINGS, OPENCODE_V2_REFERENCE, parseReview, prepareChanges, prepareReviewChunks, combineReviewChunks, renderComment, ReviewBlocked, touchesOpenCodeConfig, validateApprovedSpec, isReadableReviewTextFile, SOURCE_CONTEXT_MAX_BYTES, APPROVED_SPEC_MAX_BYTES } from '../.github/scripts/review-core.mjs';
 
 const patch = { filename: 'src/player.js', status: 'modified', additions: 2, deletions: 1, patch: '@@ -1 +1 @@\n-old\n+new' };
 
@@ -295,4 +295,21 @@ test('approved increment spec reports missing, empty, and valid content distinct
   assert.equal(validateApprovedSpec(filename, '## Цель\nПроверить\n'),
     'FILE: ' + filename + '\n## Цель\nПроверить\n');
   assert.throws(() => validateApprovedSpec('../arch062/index.html', 'test'), /Некорректный путь/);
+});
+
+test('B1 approved spec 9619 bytes loads, while optional source context stays bounded', () => {
+  const b1 = { type: 'file', encoding: 'base64', size: 9619 };
+  assert.equal(SOURCE_CONTEXT_MAX_BYTES, 9500);
+  assert.equal(APPROVED_SPEC_MAX_BYTES, 16384);
+  assert.equal(isReadableReviewTextFile(b1), false);
+  assert.equal(isReadableReviewTextFile(b1, APPROVED_SPEC_MAX_BYTES), true);
+  assert.equal(isReadableReviewTextFile({ ...b1, size: APPROVED_SPEC_MAX_BYTES }), true);
+  assert.equal(isReadableReviewTextFile({ ...b1, size: APPROVED_SPEC_MAX_BYTES + 1 },
+    APPROVED_SPEC_MAX_BYTES), false);
+  assert.equal(isReadableReviewTextFile({ ...b1, type: 'dir' },
+    APPROVED_SPEC_MAX_BYTES), false);
+  assert.equal(isReadableReviewTextFile({ ...b1, encoding: 'none' },
+    APPROVED_SPEC_MAX_BYTES), false);
+  assert.equal(isReadableReviewTextFile({ ...b1, size: -1 },
+    APPROVED_SPEC_MAX_BYTES), false);
 });
