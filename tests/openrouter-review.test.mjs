@@ -303,7 +303,8 @@ test('B1 approved spec 9619 bytes loads, while optional source context stays bou
   assert.equal(APPROVED_SPEC_MAX_BYTES, 16384);
   assert.equal(isReadableReviewTextFile(b1), false);
   assert.equal(isReadableReviewTextFile(b1, APPROVED_SPEC_MAX_BYTES), true);
-  assert.equal(isReadableReviewTextFile({ ...b1, size: APPROVED_SPEC_MAX_BYTES }), true);
+  assert.equal(isReadableReviewTextFile({ ...b1, size: APPROVED_SPEC_MAX_BYTES },
+    APPROVED_SPEC_MAX_BYTES), true);
   assert.equal(isReadableReviewTextFile({ ...b1, size: APPROVED_SPEC_MAX_BYTES + 1 },
     APPROVED_SPEC_MAX_BYTES), false);
   assert.equal(isReadableReviewTextFile({ ...b1, type: 'dir' },
