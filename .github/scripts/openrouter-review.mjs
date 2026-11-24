@@ -1,4 +1,4 @@
-import { blockedReview, buildReviewMessages, ciCommitMatchesHead, contractJobsPassed, describeOpenRouterFailure, isReviewableSourcePath, MODEL_GENERATION_SETTINGS, parseReview, prepareReviewChunks, combineReviewChunks, renderComment, validateApprovedSpec, ReviewBlocked } from './review-core.mjs';
+import { blockedReview, buildReviewMessages, ciCommitMatchesHead, contractJobsPassed, describeOpenRouterFailure, isReviewableSourcePath, isReadableReviewTextFile, SOURCE_CONTEXT_MAX_BYTES, APPROVED_SPEC_MAX_BYTES, MODEL_GENERATION_SETTINGS, parseReview, prepareReviewChunks, combineReviewChunks, renderComment, validateApprovedSpec, ReviewBlocked } from './review-core.mjs';
 
 const repo = process.env.GITHUB_REPOSITORY;
 const token = process.env.GITHUB_TOKEN;
@@ -108,10 +108,10 @@ async function getCi(pr) {
     : { conclusion: 'unverified', url: '' };
 }
 
-async function readChangedTextFile(path, ref) {
+async function readChangedTextFile(path, ref, maxBytes = SOURCE_CONTEXT_MAX_BYTES) {
   const safePath = path.split('/').map(encodeURIComponent).join('/');
   const data = await github(`${prefix}/contents/${safePath}?ref=${encodeURIComponent(ref)}`);
-  if (data.type !== 'file' || data.encoding !== 'base64' || data.size > 9500) return null;
+  if (!isReadableReviewTextFile(data, maxBytes) || typeof data.content !== 'string') return null;
   const body = Buffer.from(data.content.replace(/\s/g, ''), 'base64').toString('utf8');
   return body.includes('\u0000') ? null : body;
 }
@@ -122,7 +122,7 @@ async function loadApprovedIncrementSpecs(files, pr) {
     /^docs\/increments\/[^/]+\.md$/.test(f.filename));
   const result = [];
   for (const file of specs) {
-    const body = await readChangedTextFile(file.filename, pr.head.sha);
+    const body = await readChangedTextFile(file.filename, pr.head.sha, APPROVED_SPEC_MAX_BYTES);
     result.push(validateApprovedSpec(file.filename, body));
   }
   return result.join('\n\n');
