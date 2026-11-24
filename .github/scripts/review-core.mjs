@@ -47,6 +47,17 @@ export function ciCommitMatchesHead(runSha, headSha, parents = []) {
   return runSha === headSha || parents.some((parent) => parent.sha === headSha);
 }
 
+// Keep optional source context small; approved increment specs are mandatory and
+// may contain multibyte UTF-8 text (the B1 spec is 9,619 bytes).
+export const SOURCE_CONTEXT_MAX_BYTES = 9500;
+export const APPROVED_SPEC_MAX_BYTES = 16384;
+
+export function isReadableReviewTextFile(data, maxBytes = SOURCE_CONTEXT_MAX_BYTES) {
+  return Number.isSafeInteger(maxBytes) && maxBytes > 0 &&
+    data?.type === 'file' && data.encoding === 'base64' &&
+    Number.isSafeInteger(data.size) && data.size >= 0 && data.size <= maxBytes;
+}
+
 export function validateApprovedSpec(filename, body) {
   if (typeof filename !== 'string' || !/^docs\/increments\/[^/]+\.md$/.test(filename))
     throw new ReviewBlocked('Некорректный путь согласованного ТЗ.');
