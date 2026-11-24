@@ -1,0 +1,4 @@
+const GAME_BUILD=Object.freeze({"version": "1.1.0-rifles-b1.1", "build": "RIFLES-B1-20261123-01", "status": "prototype", "date": "2026-11-23", "baseCommit": "6c326bc8b6e6915886c8fcf69887770f17ae6356", "baseline": "arch062/", "notes": "Изолированный прототип: винтовка A как в ARCH-06.2, винтовка B1 — сквозной выстрел по траектории до 3 целей, 0,40 с."});
+const buildInfo=document.getElementById("build-info");
+if(buildInfo)buildInfo.textContent=GAME_BUILD.version+" · "+GAME_BUILD.build;
+document.title="Пепельный крестовый поход · "+GAME_BUILD.version;
